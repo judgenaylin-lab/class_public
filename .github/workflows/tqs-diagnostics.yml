@@ -1,0 +1,37 @@
+name: TQS clock diagnostics
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  clock-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build CLASS
+        run: make -j2 class
+      - name: Run diagnostic matrix
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_diagnostic_status.txt
+          for cfg in             diag_clock_A098             diag_clock_A09999             diag_full_A098_m500             diag_full_A098_m1e5
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_diagnostic_status.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_diagnostic_status.txt
+            tail -30 "output/$cfg.log" | tee -a output/tqs_diagnostic_status.txt
+          done
+          cat output/tqs_diagnostic_status.txt
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: tqs-clock-diagnostics
+          path: |
+            output/tqs_diagnostic_status.txt
+            output/diag_*.log
+            output/diag_*pk.dat
