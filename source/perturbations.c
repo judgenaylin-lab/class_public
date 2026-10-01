@@ -4085,6 +4085,12 @@ int perturbations_vector_init(
     class_define_index(ppv->index_pt_phi_scf,pba->has_scf,index_pt,1); /* scalar field density */
     class_define_index(ppv->index_pt_phi_prime_scf,pba->has_scf,index_pt,1); /* scalar field velocity */
 
+    /* TQS matched-clock and mesh fields. These variables are independent of
+       the radiation/tight-coupling approximation switches. */
+    class_define_index(ppv->index_pt_tqs_pi,ppt->tqs_enable,index_pt,1);
+    class_define_index(ppv->index_pt_tqs_varphi,ppt->tqs_enable,index_pt,1);
+    class_define_index(ppv->index_pt_tqs_varphi_prime,ppt->tqs_enable,index_pt,1);
+
     /* perturbed recombination: the indices are defined once tca is off. */
     if ( (ppt->has_perturbed_recombination == _TRUE_) && (ppw->approx[ppw->index_ap_tca] == (int)tca_off) ){
       class_define_index(ppv->index_pt_perturbed_recombination_delta_temp,_TRUE_,index_pt,1);
@@ -4738,6 +4744,15 @@ int perturbations_vector_init(
 
         ppv->y[ppv->index_pt_phi_prime_scf] =
           ppw->pv->y[ppw->pv->index_pt_phi_prime_scf];
+      }
+
+      if (ppt->tqs_enable == _TRUE_) {
+        ppv->y[ppv->index_pt_tqs_pi] =
+          ppw->pv->y[ppw->pv->index_pt_tqs_pi];
+        ppv->y[ppv->index_pt_tqs_varphi] =
+          ppw->pv->y[ppw->pv->index_pt_tqs_varphi];
+        ppv->y[ppv->index_pt_tqs_varphi_prime] =
+          ppw->pv->y[ppw->pv->index_pt_tqs_varphi_prime];
       }
 
       if (ppt->gauge == synchronous)
@@ -7256,11 +7271,50 @@ int perturbations_einstein(
          y[ppw->pv->index_pt_phi], which derivative is given by the
          second equation below (credits to Guido Walter Pettinari). */
 
-      /* equation for psi */
-      ppw->pvecmetric[ppw->index_mt_psi] = y[ppw->pv->index_pt_phi] - 4.5 * (a2/k2) * ppw->rho_plus_p_shear;
+      if (ppt->tqs_enable == _FALSE_) {
+        /* Standard GR equations for psi and phi'. */
+        ppw->pvecmetric[ppw->index_mt_psi] = y[ppw->pv->index_pt_phi] - 4.5 * (a2/k2) * ppw->rho_plus_p_shear;
+        ppw->pvecmetric[ppw->index_mt_phi_prime] = -a_prime_over_a * ppw->pvecmetric[ppw->index_mt_psi] + 1.5 * (a2/k2) * ppw->rho_plus_p_theta;
+      }
+      else {
+        /* TQS matched, regular-pinned FLRW branch in physical Newtonian gauge.
+           CLASS phi is the physical spatial potential tilde Psi and CLASS psi
+           is the physical lapse potential tilde Phi.  The scalar ij-shear
+           equation has exactly the GR form on this branch, hence the native
+           anisotropic-stress slip is retained. */
+        double A = ppt->tqs_A_clock;
+        double C = sqrt(A);
+        double Gamma = A*A/(4.*A-3.);
+        double B = 2.*A*(1.-A)/(4.*A-3.);
+        double Gamma_b = 8.*A*A*(3.-2.*A)/((4.*A-3.)*(4.*A-3.));
+        double Gamma_phi = ppt->tqs_beta_phi*Gamma_b;
+        double beta_phi = ppt->tqs_beta_phi;
+        double pi_tqs = y[ppw->pv->index_pt_tqs_pi];
+        double varphi_tqs = y[ppw->pv->index_pt_tqs_varphi];
+        double varphi_prime_tqs = y[ppw->pv->index_pt_tqs_varphi_prime];
+        double Hprime = ppw->pvecback[pba->index_bg_H_prime];
+        double theta_hat = ppw->rho_plus_p_theta
+          + ppw->rho_plus_p_tot*k2*pi_tqs/a;
+        double Xeta;
 
-      /* equation for phi' */
-      ppw->pvecmetric[ppw->index_mt_phi_prime] = -a_prime_over_a * ppw->pvecmetric[ppw->index_mt_psi] + 1.5 * (a2/k2) * ppw->rho_plus_p_theta;
+        /* Exact physical slip: no intrinsic TQS anisotropic stress. */
+        ppw->pvecmetric[ppw->index_mt_psi] =
+          y[ppw->pv->index_pt_phi] - 4.5*(a2/k2)*ppw->rho_plus_p_shear;
+
+        /* Conformal-time form of the matched 0i equation.  The normalization
+           of the matter momentum term is fixed so that A->1, beta->0
+           reproduces CLASS's GR momentum constraint. */
+        Xeta =
+          1.5*(a2/k2)*(C/Gamma)*theta_hat
+          + B*k2*pi_tqs/(2.*Gamma*A*a)
+          + (Gamma_phi/Gamma)*a_prime_over_a*varphi_tqs;
+
+        ppw->pvecmetric[ppw->index_mt_phi_prime] =
+          -a_prime_over_a*ppw->pvecmetric[ppw->index_mt_psi]
+          + beta_phi*(varphi_prime_tqs+a_prime_over_a*varphi_tqs)
+          - Hprime*pi_tqs
+          + Xeta;
+      }
 
       /* eventually, infer radiation streaming approximation for
          gamma and ur (this is exactly the right place to do it
@@ -11047,6 +11101,66 @@ int perturbations_derivs(double tau,
           }
         }
       }
+    }
+
+    /** - ---> TQS clock and mesh */
+    if (ppt->tqs_enable == _TRUE_) {
+      double A = ppt->tqs_A_clock;
+      double C = sqrt(A);
+      double alphaK = 2.*(1.-A);
+      double Gamma = A*A/(4.*A-3.);
+      double B = 2.*A*(1.-A)/(4.*A-3.);
+      double Gamma_b = 8.*A*A*(3.-2.*A)/((4.*A-3.)*(4.*A-3.));
+      double Gamma_phi = ppt->tqs_beta_phi*Gamma_b;
+      double beta_phi = ppt->tqs_beta_phi;
+      double pi_tqs = y[pv->index_pt_tqs_pi];
+      double varphi_tqs = y[pv->index_pt_tqs_varphi];
+      double varphi_prime_tqs = y[pv->index_pt_tqs_varphi_prime];
+      double phi_tqs = y[pv->index_pt_phi];
+      double psi_tqs = pvecmetric[ppw->index_mt_psi];
+      double Hphys = pvecback[pba->index_bg_H];
+      double Hprime = pvecback[pba->index_bg_H_prime];
+      double HC = ppt->tqs_HC_over_H0*pba->H0;
+      double H2 = Hphys*Hphys;
+      double HC2 = HC*HC;
+      double sC = H2/(H2+HC2);
+      double sC_prime = 2.*Hphys*Hprime*HC2/((H2+HC2)*(H2+HC2));
+      double mu = ppt->tqs_epsilon + ppt->tqs_mu_C*sC;
+      double Xi = mu + ppt->tqs_zeta0;
+      double Xi_prime = ppt->tqs_mu_C*sC_prime;
+      double mL = ppt->tqs_mL_over_H0*pba->H0;
+      double meff2 = mL*mL*sC;
+      double theta_hat = ppw->rho_plus_p_theta
+        + ppw->rho_plus_p_tot*k2*pi_tqs/a;
+      double Xeta =
+        1.5*(a2/k2)*(C/Gamma)*theta_hat
+        + B*k2*pi_tqs/(2.*Gamma*A*a)
+        + (Gamma_phi/Gamma)*a_prime_over_a*varphi_tqs;
+      double deltaK =
+        -3.*Xeta/a + k2*pi_tqs/(a2*A);
+      double rho_hat =
+        3.*C*(ppw->delta_rho
+              +3.*Hphys*ppw->rho_plus_p_tot*pi_tqs
+              -2.*beta_phi*pvecback[pba->index_bg_rho_tot]*varphi_tqs);
+      double brace00 =
+        4.*(k2/a2)*(-phi_tqs+beta_phi*varphi_tqs-Hphys*pi_tqs)
+        +4.*Gamma*Hphys*(-3.*Xeta/a+k2*pi_tqs/(a2*A))
+        +6.*Gamma_phi*Hphys*Hphys*varphi_tqs
+        -2.*rho_hat;
+      double source_mesh =
+        -2.*beta_phi*Gamma_b*a*a*Hphys*deltaK/(A*Xi)
+        -3.*beta_phi*C*a2*(ppw->delta_rho+3.*ppw->delta_p)/(A*Xi);
+
+      /* pi is stored as a proper-time displacement (Mpc); prime is d/dtau. */
+      dy[pv->index_pt_tqs_pi] =
+        a*(psi_tqs-beta_phi*varphi_tqs)
+        + a*a*a*brace00/(2.*alphaK*k2);
+
+      dy[pv->index_pt_tqs_varphi] = varphi_prime_tqs;
+      dy[pv->index_pt_tqs_varphi_prime] =
+        -(2.*a_prime_over_a + Xi_prime/Xi)*varphi_prime_tqs
+        -(mu*k2+a2*meff2)/(A*Xi)*varphi_tqs
+        + source_mesh;
     }
 
     /** - ---> metric */
