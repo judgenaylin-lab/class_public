@@ -4681,6 +4681,18 @@ int perturbations_vector_init(
       double sC_tqs = H_tqs*H_tqs/(H_tqs*H_tqs+HC_tqs*HC_tqs);
       double mu_tqs = ppt->tqs_epsilon+ppt->tqs_mu_C*sC_tqs;
       double mL_tqs = ppt->tqs_mL_over_H0*pba->H0;
+      double Gamma_bb_tqs =
+        64.*A_tqs*A_tqs*(4.*A_tqs*A_tqs-9.*A_tqs+9.)
+        /((4.*A_tqs-3.)*(4.*A_tqs-3.)*(4.*A_tqs-3.));
+      double active_bg_tqs =
+        ppw->pvecback[pba->index_bg_rho_tot]
+        +3.*ppw->pvecback[pba->index_bg_p_tot];
+      double meff2_tqs =
+        mL_tqs*mL_tqs*sC_tqs
+        +3.*ppt->tqs_beta_phi*ppt->tqs_beta_phi
+          *Gamma_bb_tqs*H_tqs*H_tqs
+        -6.*ppt->tqs_beta_phi*ppt->tqs_beta_phi
+          *C_tqs*active_bg_tqs;
       double pi_tqs = 0.;
       double Xeta0_tqs;
       double deltaK0_tqs;
@@ -4707,7 +4719,7 @@ int perturbations_vector_init(
         -3.*ppt->tqs_beta_phi*C_tqs*a2_tqs*(ppw->delta_rho+3.*ppw->delta_p);
 
       denominator_tqs =
-        mu_tqs*k2_tqs+a2_tqs*mL_tqs*mL_tqs*sC_tqs
+        mu_tqs*k2_tqs+a2_tqs*meff2_tqs
         -6.*ppt->tqs_beta_phi*Gamma_b_tqs
           *(Gamma_phi_tqs/Gamma_tqs)*a2_tqs*H_tqs*H_tqs;
 
@@ -7194,7 +7206,18 @@ int perturbations_timescale(
       double mu = ppt->tqs_epsilon+ppt->tqs_mu_C*sC;
       double Xi = mu+ppt->tqs_zeta0;
       double mL = ppt->tqs_mL_over_H0*pba->H0;
-      double omega2_tqs = (mu*pppaw->k*pppaw->k+a_tqs*a_tqs*mL*mL*sC)/(A*Xi);
+      double beta_phi = ppt->tqs_beta_phi;
+      double C = sqrt(A);
+      double Gamma_bb =
+        64.*A*A*(4.*A*A-9.*A+9.)/((4.*A-3.)*(4.*A-3.)*(4.*A-3.));
+      double active_bg =
+        pvecback[pba->index_bg_rho_tot]+3.*pvecback[pba->index_bg_p_tot];
+      double meff2 =
+        mL*mL*sC
+        +3.*beta_phi*beta_phi*Gamma_bb*Hphys*Hphys
+        -6.*beta_phi*beta_phi*C*active_bg;
+      double omega2_tqs =
+        (mu*pppaw->k*pppaw->k+a_tqs*a_tqs*meff2)/(A*Xi);
       if (omega2_tqs > 0.) {
         tau_tqs = 1./sqrt(omega2_tqs);
         *timescale = MIN(tau_tqs,*timescale);
@@ -11216,7 +11239,16 @@ int perturbations_derivs(double tau,
       double Xi = mu + ppt->tqs_zeta0;
       double Xi_prime = ppt->tqs_mu_C*sC_prime;
       double mL = ppt->tqs_mL_over_H0*pba->H0;
-      double meff2 = mL*mL*sC;
+      double Gamma_bb =
+        64.*A*A*(4.*A*A-9.*A+9.)/((4.*A-3.)*(4.*A-3.)*(4.*A-3.));
+      double active_bg =
+        pvecback[pba->index_bg_rho_tot]+3.*pvecback[pba->index_bg_p_tot];
+      /* Full curvature of the homogeneous TQS driving force:
+         pinning + clock susceptibility + disformal active-mass term. */
+      double meff2 =
+        mL*mL*sC
+        +3.*beta_phi*beta_phi*Gamma_bb*Hphys*Hphys
+        -6.*beta_phi*beta_phi*C*active_bg;
       double theta_hat = ppw->rho_plus_p_theta
         + ppw->rho_plus_p_tot*k2*pi_tqs/a;
       double Xeta =
