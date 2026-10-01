@@ -4651,6 +4651,66 @@ int perturbations_vector_init(
                ppt->error_message,
                ppt->error_message);
 
+    /* Put the additional TQS variables on the regular adiabatic branch.
+       The preferred clock is initially aligned with the total energy-flow
+       slicing (J_hat=0), while the heavy mesh field starts on the
+       instantaneous regular-pinning attractor instead of at varphi=0. */
+    if (_scalars_ && (ppt->tqs_enable == _TRUE_)) {
+      double a_tqs = ppw->pvecback[pba->index_bg_a];
+      double a2_tqs = a_tqs*a_tqs;
+      double k2_tqs = k*k;
+      double H_tqs = ppw->pvecback[pba->index_bg_H];
+      double Hc_tqs = a_tqs*H_tqs;
+      double A_tqs = ppt->tqs_A_clock;
+      double C_tqs = sqrt(A_tqs);
+      double Gamma_tqs = A_tqs*A_tqs/(4.*A_tqs-3.);
+      double B_tqs = 2.*A_tqs*(1.-A_tqs)/(4.*A_tqs-3.);
+      double Gamma_b_tqs =
+        8.*A_tqs*A_tqs*(3.-2.*A_tqs)/((4.*A_tqs-3.)*(4.*A_tqs-3.));
+      double Gamma_phi_tqs = ppt->tqs_beta_phi*Gamma_b_tqs;
+      double HC_tqs = ppt->tqs_HC_over_H0*pba->H0;
+      double sC_tqs = H_tqs*H_tqs/(H_tqs*H_tqs+HC_tqs*HC_tqs);
+      double mu_tqs = ppt->tqs_epsilon+ppt->tqs_mu_C*sC_tqs;
+      double mL_tqs = ppt->tqs_mL_over_H0*pba->H0;
+      double pi_tqs = 0.;
+      double Xeta0_tqs;
+      double deltaK0_tqs;
+      double numerator_tqs;
+      double denominator_tqs;
+
+      class_call(perturbations_total_stress_energy(ppr,pba,pth,ppt,index_md,k,ppv->y,ppw),
+                 ppt->error_message,
+                 ppt->error_message);
+
+      if ((ppw->rho_plus_p_tot != 0.) && (k2_tqs != 0.)) {
+        pi_tqs = -a_tqs*ppw->rho_plus_p_theta/(ppw->rho_plus_p_tot*k2_tqs);
+      }
+      ppv->y[ppv->index_pt_tqs_pi] = pi_tqs;
+
+      /* With the above clock choice J_hat vanishes at leading adiabatic order. */
+      Xeta0_tqs =
+        B_tqs*k2_tqs*pi_tqs/(2.*Gamma_tqs*A_tqs*a_tqs);
+      deltaK0_tqs =
+        -3.*Xeta0_tqs/a_tqs+k2_tqs*pi_tqs/(a2_tqs*A_tqs);
+
+      numerator_tqs =
+        -2.*ppt->tqs_beta_phi*Gamma_b_tqs*a2_tqs*H_tqs*deltaK0_tqs
+        -3.*ppt->tqs_beta_phi*C_tqs*a2_tqs*(ppw->delta_rho+3.*ppw->delta_p);
+
+      denominator_tqs =
+        mu_tqs*k2_tqs+a2_tqs*mL_tqs*mL_tqs*sC_tqs
+        -6.*ppt->tqs_beta_phi*Gamma_b_tqs
+          *(Gamma_phi_tqs/Gamma_tqs)*a2_tqs*H_tqs*H_tqs;
+
+      if (fabs(denominator_tqs) > 0.) {
+        ppv->y[ppv->index_pt_tqs_varphi] = numerator_tqs/denominator_tqs;
+      }
+      else {
+        ppv->y[ppv->index_pt_tqs_varphi] = 0.;
+      }
+      ppv->y[ppv->index_pt_tqs_varphi_prime] = 0.;
+    }
+
   }
 
   /** - case of switching approximation while a wavenumber is being integrated */
@@ -7064,6 +7124,8 @@ int perturbations_timescale(
   double tau_h;
   /* (c) time scale of recombination, \f$ \tau_{\gamma} = 1/\kappa' \f$ */
   double tau_c;
+  /* (d) TQS mesh oscillation time scale */
+  double tau_tqs;
 
   /* various pointers allowing to extract the fields of the
      parameter_and_workspace input structure */
@@ -7113,6 +7175,22 @@ int perturbations_timescale(
 
     if ((ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) || (pba->has_ncdm == _TRUE_))
       *timescale = MIN(tau_k,*timescale);
+
+    if (ppt->tqs_enable == _TRUE_) {
+      double A = ppt->tqs_A_clock;
+      double Hphys = pvecback[pba->index_bg_H];
+      double a_tqs = pvecback[pba->index_bg_a];
+      double HC = ppt->tqs_HC_over_H0*pba->H0;
+      double sC = Hphys*Hphys/(Hphys*Hphys+HC*HC);
+      double mu = ppt->tqs_epsilon+ppt->tqs_mu_C*sC;
+      double Xi = mu+ppt->tqs_zeta0;
+      double mL = ppt->tqs_mL_over_H0*pba->H0;
+      double omega2_tqs = (mu*pppaw->k*pppaw->k+a_tqs*a_tqs*mL*mL*sC)/(A*Xi);
+      if (omega2_tqs > 0.) {
+        tau_tqs = 1./sqrt(omega2_tqs);
+        *timescale = MIN(tau_tqs,*timescale);
+      }
+    }
 
     if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) {
 
