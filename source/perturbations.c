@@ -2932,6 +2932,7 @@ int perturbations_solve(
   int * previous_approx;
 
   int n_ncdm,is_early_enough;
+  ErrorMsg tqs_evolver_error;
 
   /* function pointer to ODE evolver and names of possible evolvers */
 
@@ -3229,24 +3230,32 @@ int perturbations_solve(
       generic_evolver = evolver_ndf15;
     }
 
-    class_call(generic_evolver(perturbations_derivs,
-                               interval_limit[index_interval],
-                               interval_limit[index_interval+1],
-                               ppw->pv->y,
-                               ppw->pv->used_in_sources,
-                               ppw->pv->pt_size,
-                               &ppaw,
-                               ppr->tol_perturbations_integration,
-                               ppr->smallest_allowed_variation,
-                               perturbations_timescale,
-                               ppr->perturbations_integration_stepsize,
-                               ppt->tau_sampling,
-                               tau_actual_size,
-                               perturbations_sources,
-                               perhaps_print_variables,
-                               ppt->error_message),
-               ppt->error_message,
-               ppt->error_message);
+    if (generic_evolver(perturbations_derivs,
+                        interval_limit[index_interval],
+                        interval_limit[index_interval+1],
+                        ppw->pv->y,
+                        ppw->pv->used_in_sources,
+                        ppw->pv->pt_size,
+                        &ppaw,
+                        ppr->tol_perturbations_integration,
+                        ppr->smallest_allowed_variation,
+                        perturbations_timescale,
+                        ppr->perturbations_integration_stepsize,
+                        ppt->tau_sampling,
+                        tau_actual_size,
+                        perturbations_sources,
+                        perhaps_print_variables,
+                        tqs_evolver_error) == _FAILURE_) {
+      class_stop(ppt->error_message,
+                 "perturbation evolver failed at k=%g 1/Mpc, index_k=%d, interval=%d/%d, tau=[%g,%g]. Underlying error: %s",
+                 k,
+                 index_k,
+                 index_interval,
+                 interval_number,
+                 interval_limit[index_interval],
+                 interval_limit[index_interval+1],
+                 tqs_evolver_error);
+    }
 
   }
 
