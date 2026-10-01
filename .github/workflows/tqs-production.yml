@@ -15,7 +15,7 @@ jobs:
       - name: Run baseline LambdaCDM
         run: ./class .github/tqs/lcdm.ini
       - name: Run TQS
-        run: ./class .github/tqs/tqs.ini
+        run: ./class .github/tqs/tqs_stable.ini
       - name: Compare spectra
         run: python3 .github/tqs/compare_spectra.py
       - name: Upload spectra
