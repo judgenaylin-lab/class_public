@@ -398,6 +398,11 @@ int background_functions(
   double w_fld, dw_over_da, integral_fld;
   /* scalar field quantities */
   double phi, phi_prime;
+  /* homogeneous TQS mesh quantities */
+  double tqs_phi=0.,tqs_phi_prime=0.,tqs_A=1.,tqs_C=1.;
+  double tqs_sC=0.,tqs_mu=0.,tqs_Xi=1.;
+  double tqs_Gamma=1.,tqs_Gamma_b=0.,tqs_Gamma_bb=0.,tqs_force=0.;
+  double tqs_HC=0.,tqs_mL=0.;
   /* Since we only know a_prime_over_a after we have rho_tot,
      it is not possible to simply sum up p_tot_prime directly.
      Instead we sum up dp_dloga = p_prime/a_prime_over_a. The formula is
@@ -572,6 +577,14 @@ int background_functions(
     rho_r += pvecback[pba->index_bg_rho_idr];
   }
 
+  /* TQS homogeneous state is evolved as a consistency test on the
+     standard CLASS background expansion at this stage. It is therefore
+     not yet added to rho_tot or p_tot. */
+  if (pba->tqs_enable == _TRUE_) {
+    tqs_phi = pvecback_B[pba->index_bi_tqs_phi];
+    tqs_phi_prime = pvecback_B[pba->index_bi_tqs_phi_prime];
+  }
+
   /** - compute expansion rate H from Friedmann equation: this is the
       only place where the Friedmann equation is assumed. Remember
       that densities are all expressed in units of \f$ [3c^2/8\pi G] \f$, ie
@@ -580,6 +593,43 @@ int background_functions(
 
   /** - compute derivative of H with respect to conformal time */
   pvecback[pba->index_bg_H_prime] = - (3./2.) * (rho_tot + p_tot) * a + pba->K/a;
+
+  if (pba->tqs_enable == _TRUE_) {
+    tqs_A = pba->tqs_A_clock*exp(-4.*pba->tqs_beta_phi*tqs_phi);
+    class_test((tqs_A <= 0.75) || (tqs_A >= 1.0),
+               pba->error_message,
+               "TQS homogeneous background left healthy branch: A=%g at a=%g, phi=%g",
+               tqs_A,a,tqs_phi);
+    tqs_C = sqrt(tqs_A);
+    tqs_Gamma = tqs_A*tqs_A/(4.*tqs_A-3.);
+    tqs_Gamma_b =
+      8.*tqs_A*tqs_A*(3.-2.*tqs_A)/((4.*tqs_A-3.)*(4.*tqs_A-3.));
+    tqs_Gamma_bb =
+      64.*tqs_A*tqs_A*(4.*tqs_A*tqs_A-9.*tqs_A+9.)
+      /((4.*tqs_A-3.)*(4.*tqs_A-3.)*(4.*tqs_A-3.));
+    tqs_HC = pba->tqs_HC_over_H0*pba->H0;
+    tqs_mL = pba->tqs_mL_over_H0*pba->H0;
+    tqs_sC = pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]
+      /(pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]+tqs_HC*tqs_HC);
+    tqs_mu = pba->tqs_epsilon+pba->tqs_mu_C*tqs_sC;
+    tqs_Xi = tqs_mu+pba->tqs_zeta0;
+    tqs_force =
+      3.*pba->tqs_beta_phi*tqs_Gamma_b
+        *pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]
+      +3.*pba->tqs_beta_phi*tqs_C*(rho_tot+3.*p_tot)
+      +tqs_mL*tqs_mL*tqs_sC*tqs_phi;
+
+    pvecback[pba->index_bg_tqs_phi] = tqs_phi;
+    pvecback[pba->index_bg_tqs_phi_prime] = tqs_phi_prime;
+    pvecback[pba->index_bg_tqs_A] = tqs_A;
+    pvecback[pba->index_bg_tqs_sC] = tqs_sC;
+    pvecback[pba->index_bg_tqs_mu] = tqs_mu;
+    pvecback[pba->index_bg_tqs_Xi] = tqs_Xi;
+    pvecback[pba->index_bg_tqs_Gamma] = tqs_Gamma;
+    pvecback[pba->index_bg_tqs_Gamma_b] = tqs_Gamma_b;
+    pvecback[pba->index_bg_tqs_Gamma_bb] = tqs_Gamma_bb;
+    pvecback[pba->index_bg_tqs_force] = tqs_force;
+  }
 
   /* Total energy density*/
   pvecback[pba->index_bg_rho_tot] = rho_tot;
@@ -1073,6 +1123,18 @@ int background_indices(
   class_define_index(pba->index_bg_p_scf,pba->has_scf,index_bg,1);
   class_define_index(pba->index_bg_p_prime_scf,pba->has_scf,index_bg,1);
 
+  /* - TQS homogeneous mesh diagnostics */
+  class_define_index(pba->index_bg_tqs_phi,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_phi_prime,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_A,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_sC,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_mu,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Xi,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Gamma,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Gamma_b,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Gamma_bb,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_force,pba->tqs_enable,index_bg,1);
+
   /* - index for Lambda */
   class_define_index(pba->index_bg_rho_lambda,pba->has_lambda,index_bg,1);
 
@@ -1168,6 +1230,10 @@ int background_indices(
   /* -> scalar field and its derivative wrt conformal time (Zuma) */
   class_define_index(pba->index_bi_phi_scf,pba->has_scf,index_bi,1);
   class_define_index(pba->index_bi_phi_prime_scf,pba->has_scf,index_bi,1);
+
+  /* -> homogeneous TQS mesh and conformal-time derivative */
+  class_define_index(pba->index_bi_tqs_phi,pba->tqs_enable,index_bi,1);
+  class_define_index(pba->index_bi_tqs_phi_prime,pba->tqs_enable,index_bi,1);
 
   /* End of {B} variables */
   pba->bi_B_size = index_bi;
@@ -2089,6 +2155,36 @@ int background_solve(
     }
   }
 
+  if (pba->tqs_enable == _TRUE_) {
+    int i_tqs;
+    int i_rec = 0;
+    double dz_rec = 1.e100;
+    double A_min = 1.e100;
+    double A_max = -1.e100;
+    double A_ini = pba->background_table[pba->index_bg_tqs_A];
+    double A_today = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_tqs_A];
+    double phi_today = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_tqs_phi];
+
+    for (i_tqs=0; i_tqs<pba->bt_size; i_tqs++) {
+      double A_i = pba->background_table[i_tqs*pba->bg_size+pba->index_bg_tqs_A];
+      double dz_i = fabs(pba->z_table[i_tqs]-1090.);
+      if (A_i < A_min) A_min = A_i;
+      if (A_i > A_max) A_max = A_i;
+      if (dz_i < dz_rec) {
+        dz_rec = dz_i;
+        i_rec = i_tqs;
+      }
+    }
+    printf("TQS_BACKGROUND_SUMMARY A_ini=%.10g A_rec=%.10g z_rec_sample=%.8g A_today=%.10g A_min=%.10g A_max=%.10g phi_today=%.10g\n",
+           A_ini,
+           pba->background_table[i_rec*pba->bg_size+pba->index_bg_tqs_A],
+           pba->z_table[i_rec],
+           A_today,
+           A_min,
+           A_max,
+           phi_today);
+  }
+
   /**  - store information in the background structure */
   pba->Omega0_m = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_Omega_m];
   pba->Omega0_r = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_Omega_r];
@@ -2264,6 +2360,14 @@ int background_initial_conditions(
    * - Check equations and signs. Sign of phi_prime?
    * - is rho_ur all there is early on?
    */
+  if (pba->tqs_enable == _TRUE_) {
+    /* Do not impose a fictitious high-redshift pinning equilibrium.
+       Start at the reference configuration and let the homogeneous
+       equations decide whether the healthy branch is dynamically viable. */
+    pvecback_integration[pba->index_bi_tqs_phi] = 0.;
+    pvecback_integration[pba->index_bi_tqs_phi_prime] = 0.;
+  }
+
   if (pba->has_scf == _TRUE_) {
     scf_lambda = pba->scf_parameters[0];
     if (pba->attractor_ic_scf == _TRUE_) {
@@ -2665,6 +2769,27 @@ int background_derivs(
         written as \f$ d\phi/dlna = phi' / (aH) \f$ and \f$ d\phi'/dlna = -2*phi' - (a/H) dV \f$ */
     dy[pba->index_bi_phi_scf] = y[pba->index_bi_phi_prime_scf]/a/H;
     dy[pba->index_bi_phi_prime_scf] = - 2*y[pba->index_bi_phi_prime_scf] - a*dV_scf(pba,y[pba->index_bi_phi_scf])/H ;
+  }
+
+  if (pba->tqs_enable == _TRUE_) {
+    double HC = pba->tqs_HC_over_H0*pba->H0;
+    double Hprime = pvecback[pba->index_bg_H_prime];
+    double sC = pvecback[pba->index_bg_tqs_sC];
+    double Xi = pvecback[pba->index_bg_tqs_Xi];
+    double dH_dlna = Hprime/(a*H);
+    double dsC_dlna =
+      2.*H*HC*HC*dH_dlna
+      /((H*H+HC*HC)*(H*H+HC*HC));
+    double dXi_dlna = pba->tqs_mu_C*dsC_dlna;
+    double A = pvecback[pba->index_bg_tqs_A];
+    double force = pvecback[pba->index_bg_tqs_force];
+    double tqs_prime = y[pba->index_bi_tqs_phi_prime];
+
+    dy[pba->index_bi_tqs_phi] = tqs_prime/(a*H);
+    dy[pba->index_bi_tqs_phi_prime] =
+      -(2.+dXi_dlna/Xi)*tqs_prime
+      +2.*pba->tqs_beta_phi*tqs_prime*tqs_prime/(a*H)
+      -a*force/(H*A*Xi);
   }
 
   return _SUCCESS_;

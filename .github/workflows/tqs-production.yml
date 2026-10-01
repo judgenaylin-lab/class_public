@@ -1,0 +1,30 @@
+name: TQS production CLASS smoke
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-spectra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build CLASS
+        run: make -j2 class
+      - name: Run baseline LambdaCDM
+        run: ./class .github/tqs/lcdm.ini
+      - name: Run TQS
+        run: ./class .github/tqs/tqs_stable.ini
+      - name: Compare spectra
+        run: python3 .github/tqs/compare_spectra.py
+      - name: Upload spectra
+        uses: actions/upload-artifact@v4
+        with:
+          name: tqs-class-spectra
+          path: |
+            output/tqs_lcdm_*cl*.dat
+            output/tqs_model_*cl*.dat
+            output/tqs_spectrum_comparison.csv
+            output/tqs_lcdm_*pk*.dat
+            output/tqs_model_*pk*.dat
