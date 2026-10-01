@@ -1073,6 +1073,18 @@ int background_indices(
   class_define_index(pba->index_bg_p_scf,pba->has_scf,index_bg,1);
   class_define_index(pba->index_bg_p_prime_scf,pba->has_scf,index_bg,1);
 
+  /* - TQS homogeneous mesh diagnostics */
+  class_define_index(pba->index_bg_tqs_phi,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_phi_prime,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_A,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_sC,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_mu,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Xi,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Gamma,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Gamma_b,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Gamma_bb,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_force,pba->tqs_enable,index_bg,1);
+
   /* - index for Lambda */
   class_define_index(pba->index_bg_rho_lambda,pba->has_lambda,index_bg,1);
 
@@ -1168,6 +1180,10 @@ int background_indices(
   /* -> scalar field and its derivative wrt conformal time (Zuma) */
   class_define_index(pba->index_bi_phi_scf,pba->has_scf,index_bi,1);
   class_define_index(pba->index_bi_phi_prime_scf,pba->has_scf,index_bi,1);
+
+  /* -> homogeneous TQS mesh and conformal-time derivative */
+  class_define_index(pba->index_bi_tqs_phi,pba->tqs_enable,index_bi,1);
+  class_define_index(pba->index_bi_tqs_phi_prime,pba->tqs_enable,index_bi,1);
 
   /* End of {B} variables */
   pba->bi_B_size = index_bi;
