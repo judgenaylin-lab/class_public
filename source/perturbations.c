@@ -3246,15 +3246,35 @@ int perturbations_solve(
                         perturbations_sources,
                         perhaps_print_variables,
                         tqs_evolver_error) == _FAILURE_) {
-      class_stop(ppt->error_message,
-                 "perturbation evolver failed at k=%g 1/Mpc, index_k=%d, interval=%d/%d, tau=[%g,%g]. Underlying error: %s",
-                 k,
-                 index_k,
-                 index_interval,
-                 interval_number,
-                 interval_limit[index_interval],
-                 interval_limit[index_interval+1],
-                 tqs_evolver_error);
+      if ((ppt->tqs_enable == _TRUE_) && _scalars_) {
+        class_stop(ppt->error_message,
+                   "TQS evolver failed at k=%g 1/Mpc, index_k=%d, interval=%d/%d, tau=[%g,%g]. "
+                   "state: phi=%g psi=%g pi=%g varphi=%g varphi_prime=%g phi_prime=%g. Underlying error: %s",
+                   k,
+                   index_k,
+                   index_interval,
+                   interval_number,
+                   interval_limit[index_interval],
+                   interval_limit[index_interval+1],
+                   ppw->pv->y[ppw->pv->index_pt_phi],
+                   ppw->pvecmetric[ppw->index_mt_psi],
+                   ppw->pv->y[ppw->pv->index_pt_tqs_pi],
+                   ppw->pv->y[ppw->pv->index_pt_tqs_varphi],
+                   ppw->pv->y[ppw->pv->index_pt_tqs_varphi_prime],
+                   ppw->pvecmetric[ppw->index_mt_phi_prime],
+                   tqs_evolver_error);
+      }
+      else {
+        class_stop(ppt->error_message,
+                   "perturbation evolver failed at k=%g 1/Mpc, index_k=%d, interval=%d/%d, tau=[%g,%g]. Underlying error: %s",
+                   k,
+                   index_k,
+                   index_interval,
+                   interval_number,
+                   interval_limit[index_interval],
+                   interval_limit[index_interval+1],
+                   tqs_evolver_error);
+      }
     }
 
   }
