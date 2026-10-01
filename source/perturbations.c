@@ -4690,20 +4690,17 @@ int perturbations_vector_init(
       double k2_tqs = k*k;
       double H_tqs = ppw->pvecback[pba->index_bg_H];
       double Hc_tqs = a_tqs*H_tqs;
-      double A_tqs = ppt->tqs_A_clock;
+      double A_tqs = ppw->pvecback[pba->index_bg_tqs_A];
       double C_tqs = sqrt(A_tqs);
-      double Gamma_tqs = A_tqs*A_tqs/(4.*A_tqs-3.);
+      double Gamma_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma];
       double B_tqs = 2.*A_tqs*(1.-A_tqs)/(4.*A_tqs-3.);
-      double Gamma_b_tqs =
-        8.*A_tqs*A_tqs*(3.-2.*A_tqs)/((4.*A_tqs-3.)*(4.*A_tqs-3.));
+      double Gamma_b_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma_b];
       double Gamma_phi_tqs = ppt->tqs_beta_phi*Gamma_b_tqs;
       double HC_tqs = ppt->tqs_HC_over_H0*pba->H0;
-      double sC_tqs = H_tqs*H_tqs/(H_tqs*H_tqs+HC_tqs*HC_tqs);
-      double mu_tqs = ppt->tqs_epsilon+ppt->tqs_mu_C*sC_tqs;
+      double sC_tqs = ppw->pvecback[pba->index_bg_tqs_sC];
+      double mu_tqs = ppw->pvecback[pba->index_bg_tqs_mu];
       double mL_tqs = ppt->tqs_mL_over_H0*pba->H0;
-      double Gamma_bb_tqs =
-        64.*A_tqs*A_tqs*(4.*A_tqs*A_tqs-9.*A_tqs+9.)
-        /((4.*A_tqs-3.)*(4.*A_tqs-3.)*(4.*A_tqs-3.));
+      double Gamma_bb_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma_bb];
       double active_bg_tqs =
         ppw->pvecback[pba->index_bg_rho_tot]
         +3.*ppw->pvecback[pba->index_bg_p_tot];
@@ -7218,18 +7215,17 @@ int perturbations_timescale(
       *timescale = MIN(tau_k,*timescale);
 
     if (ppt->tqs_enable == _TRUE_) {
-      double A = ppt->tqs_A_clock;
+      double A = pvecback[pba->index_bg_tqs_A];
       double Hphys = pvecback[pba->index_bg_H];
       double a_tqs = pvecback[pba->index_bg_a];
       double HC = ppt->tqs_HC_over_H0*pba->H0;
-      double sC = Hphys*Hphys/(Hphys*Hphys+HC*HC);
-      double mu = ppt->tqs_epsilon+ppt->tqs_mu_C*sC;
-      double Xi = mu+ppt->tqs_zeta0;
+      double sC = pvecback[pba->index_bg_tqs_sC];
+      double mu = pvecback[pba->index_bg_tqs_mu];
+      double Xi = pvecback[pba->index_bg_tqs_Xi];
       double mL = ppt->tqs_mL_over_H0*pba->H0;
       double beta_phi = ppt->tqs_beta_phi;
       double C = sqrt(A);
-      double Gamma_bb =
-        64.*A*A*(4.*A*A-9.*A+9.)/((4.*A-3.)*(4.*A-3.)*(4.*A-3.));
+      double Gamma_bb = pvecback[pba->index_bg_tqs_Gamma_bb];
       double active_bg =
         pvecback[pba->index_bg_rho_tot]+3.*pvecback[pba->index_bg_p_tot];
       double meff2 =
@@ -7412,11 +7408,11 @@ int perturbations_einstein(
            is the physical lapse potential tilde Phi.  The scalar ij-shear
            equation has exactly the GR form on this branch, hence the native
            anisotropic-stress slip is retained. */
-        double A = ppt->tqs_A_clock;
+        double A = ppw->pvecback[pba->index_bg_tqs_A];
         double C = sqrt(A);
-        double Gamma = A*A/(4.*A-3.);
+        double Gamma = ppw->pvecback[pba->index_bg_tqs_Gamma];
         double B = 2.*A*(1.-A)/(4.*A-3.);
-        double Gamma_b = 8.*A*A*(3.-2.*A)/((4.*A-3.)*(4.*A-3.));
+        double Gamma_b = ppw->pvecback[pba->index_bg_tqs_Gamma_b];
         double Gamma_phi = ppt->tqs_beta_phi*Gamma_b;
         double beta_phi = ppt->tqs_beta_phi;
         double pi_tqs = y[ppw->pv->index_pt_tqs_pi];
@@ -11235,12 +11231,12 @@ int perturbations_derivs(double tau,
 
     /** - ---> TQS clock and mesh */
     if (ppt->tqs_enable == _TRUE_) {
-      double A = ppt->tqs_A_clock;
+      double A = pvecback[pba->index_bg_tqs_A];
       double C = sqrt(A);
       double alphaK = 2.*(1.-A);
-      double Gamma = A*A/(4.*A-3.);
+      double Gamma = pvecback[pba->index_bg_tqs_Gamma];
       double B = 2.*A*(1.-A)/(4.*A-3.);
-      double Gamma_b = 8.*A*A*(3.-2.*A)/((4.*A-3.)*(4.*A-3.));
+      double Gamma_b = pvecback[pba->index_bg_tqs_Gamma_b];
       double Gamma_phi = ppt->tqs_beta_phi*Gamma_b;
       double beta_phi = ppt->tqs_beta_phi;
       double pi_tqs = y[pv->index_pt_tqs_pi];
@@ -11253,14 +11249,13 @@ int perturbations_derivs(double tau,
       double HC = ppt->tqs_HC_over_H0*pba->H0;
       double H2 = Hphys*Hphys;
       double HC2 = HC*HC;
-      double sC = H2/(H2+HC2);
+      double sC = pvecback[pba->index_bg_tqs_sC];
       double sC_prime = 2.*Hphys*Hprime*HC2/((H2+HC2)*(H2+HC2));
-      double mu = ppt->tqs_epsilon + ppt->tqs_mu_C*sC;
-      double Xi = mu + ppt->tqs_zeta0;
+      double mu = pvecback[pba->index_bg_tqs_mu];
+      double Xi = pvecback[pba->index_bg_tqs_Xi];
       double Xi_prime = ppt->tqs_mu_C*sC_prime;
       double mL = ppt->tqs_mL_over_H0*pba->H0;
-      double Gamma_bb =
-        64.*A*A*(4.*A*A-9.*A+9.)/((4.*A-3.)*(4.*A-3.)*(4.*A-3.));
+      double Gamma_bb = pvecback[pba->index_bg_tqs_Gamma_bb];
       double active_bg =
         pvecback[pba->index_bg_rho_tot]+3.*pvecback[pba->index_bg_p_tot];
       /* Full curvature of the homogeneous TQS driving force:
