@@ -23,6 +23,13 @@ jobs:
             bg_muC_100 \
             bg_muC_300 \
             bg_muC_1000 \
+            bg_muC_1200 \
+            bg_muC_1500 \
+            bg_muC_1800 \
+            bg_muC_2000 \
+            bg_muC_2200 \
+            bg_muC_2500 \
+            bg_muC_2750 \
             bg_muC_3000 \
             bg_muC_10000
           do
