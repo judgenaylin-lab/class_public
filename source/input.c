@@ -2201,6 +2201,17 @@ int input_read_parameters_general(struct file_content * pfc,
       class_read_double("tqs_zeta0",ppt->tqs_zeta0);
       class_read_double("tqs_mL_over_H0",ppt->tqs_mL_over_H0);
 
+      /* Keep the homogeneous background and perturbation sectors on
+         exactly the same TQS parameter point. */
+      pba->tqs_enable = ppt->tqs_enable;
+      pba->tqs_A_clock = ppt->tqs_A_clock;
+      pba->tqs_beta_phi = ppt->tqs_beta_phi;
+      pba->tqs_epsilon = ppt->tqs_epsilon;
+      pba->tqs_mu_C = ppt->tqs_mu_C;
+      pba->tqs_HC_over_H0 = ppt->tqs_HC_over_H0;
+      pba->tqs_zeta0 = ppt->tqs_zeta0;
+      pba->tqs_mL_over_H0 = ppt->tqs_mL_over_H0;
+
       class_test(ppt->gauge != newtonian,
                  errmsg,
                  "TQS currently requires gauge = newtonian");
@@ -5919,6 +5930,14 @@ int input_default_params(struct background *pba,
   ppt->tqs_HC_over_H0 = 0.1;
   ppt->tqs_zeta0 = 0.9;
   ppt->tqs_mL_over_H0 = 1.e5;
+  pba->tqs_enable = _FALSE_;
+  pba->tqs_A_clock = ppt->tqs_A_clock;
+  pba->tqs_beta_phi = ppt->tqs_beta_phi;
+  pba->tqs_epsilon = ppt->tqs_epsilon;
+  pba->tqs_mu_C = ppt->tqs_mu_C;
+  pba->tqs_HC_over_H0 = ppt->tqs_HC_over_H0;
+  pba->tqs_zeta0 = ppt->tqs_zeta0;
+  pba->tqs_mL_over_H0 = ppt->tqs_mL_over_H0;
 
   /** 5) Hubble parameter */
   pba->h = 0.67810;
