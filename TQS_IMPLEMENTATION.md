@@ -56,3 +56,54 @@ which has the same CLASS form as GR on the matched pinned branch.
 7. only then attach observational likelihoods.
 
 Do not interpret the smoke-test spectra as a fit before these checks pass.
+
+
+## Dynamic-background production result (2026-10-01)
+
+The fixed-background implementation was found to be inconsistent for nonzero
+beta_phi.  The homogeneous mesh is now evolved as
+
+```
+phi_TQS'' + (2 Hconf + Xi'/Xi) phi_TQS'
+           - 2 beta_phi (phi_TQS')^2
+           + a^2 F_TQS/(A Xi) = 0
+```
+
+with
+
+```
+F_TQS =
+  3 beta_phi Gamma_b H^2
+  + 3 beta_phi sqrt(A) (rho + 3 p)
+  + m_L^2 s_C phi_TQS
+```
+
+and
+
+```
+A(phi_TQS) = A_ref exp(-4 beta_phi phi_TQS).
+```
+
+This first stage intentionally keeps the standard CLASS LambdaCDM Friedmann
+background so that homogeneous mesh consistency can be tested separately from
+the not-yet-final TQS Friedmann equation.
+
+For A_ref=0.98, beta_phi=0.111272 and m_L/H0=1e5:
+
+- mu_C <= 1800 leaves the healthy branch A<1.
+- mu_C = 2000 survives but reaches A_max ~= 0.999257.
+- mu_C = 2200 gives A_max ~= 0.997612.
+- mu_C = 2500 gives A_rec ~= 0.995361 and A_max ~= 0.995614.
+- mu_C = 3000 gives A_rec ~= 0.992902 and A_max ~= 0.993136.
+
+The current provisional production smoke point is mu_C=2500.
+
+At that point the native CLASS CMB integration completes.  The first
+background-fed perturbation comparison gives percent-level spectral shifts
+(roughly +4% TT/EE and +8% lensing over much of the acoustic range).
+
+IMPORTANT: these are diagnostic spectra, not final TQS predictions.  Once
+phi_TQS(t) is non-constant, the exact second variation contains additional
+terms proportional to the homogeneous phi_TQS' and phi_TQS''.  Those terms
+have not yet been derived/implemented.  A precision likelihood must wait for
+that moving-background second variation.
