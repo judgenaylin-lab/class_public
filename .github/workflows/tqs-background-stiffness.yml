@@ -1,0 +1,41 @@
+name: TQS homogeneous stiffness scan
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  background-stiffness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -j2 class
+      - name: Scan mu_C
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_background_stiffness.txt
+          for cfg in \
+            bg_muC_12 \
+            bg_muC_50 \
+            bg_muC_100 \
+            bg_muC_300 \
+            bg_muC_1000 \
+            bg_muC_3000 \
+            bg_muC_10000
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_background_stiffness.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_background_stiffness.txt
+            tail -12 "output/$cfg.log" | tee -a output/tqs_background_stiffness.txt
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tqs-background-stiffness
+          path: |
+            output/tqs_background_stiffness.txt
+            output/bg_muC_*.log
+            output/bg_muC_*pk.dat
