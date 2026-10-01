@@ -2155,6 +2155,36 @@ int background_solve(
     }
   }
 
+  if (pba->tqs_enable == _TRUE_) {
+    int i_tqs;
+    int i_rec = 0;
+    double dz_rec = 1.e100;
+    double A_min = 1.e100;
+    double A_max = -1.e100;
+    double A_ini = pba->background_table[pba->index_bg_tqs_A];
+    double A_today = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_tqs_A];
+    double phi_today = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_tqs_phi];
+
+    for (i_tqs=0; i_tqs<pba->bt_size; i_tqs++) {
+      double A_i = pba->background_table[i_tqs*pba->bg_size+pba->index_bg_tqs_A];
+      double dz_i = fabs(pba->z_table[i_tqs]-1090.);
+      if (A_i < A_min) A_min = A_i;
+      if (A_i > A_max) A_max = A_i;
+      if (dz_i < dz_rec) {
+        dz_rec = dz_i;
+        i_rec = i_tqs;
+      }
+    }
+    printf("TQS_BACKGROUND_SUMMARY A_ini=%.10g A_rec=%.10g z_rec_sample=%.8g A_today=%.10g A_min=%.10g A_max=%.10g phi_today=%.10g\n",
+           A_ini,
+           pba->background_table[i_rec*pba->bg_size+pba->index_bg_tqs_A],
+           pba->z_table[i_rec],
+           A_today,
+           A_min,
+           A_max,
+           phi_today);
+  }
+
   /**  - store information in the background structure */
   pba->Omega0_m = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_Omega_m];
   pba->Omega0_r = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_Omega_r];
