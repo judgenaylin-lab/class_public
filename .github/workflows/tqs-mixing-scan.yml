@@ -1,0 +1,42 @@
+name: TQS clock-mesh mixing scan
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  mixing-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build CLASS
+        run: make -j2 class
+      - name: Run mixing scan
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_mixing_scan.txt
+          for cfg in \
+            mix_A099 \
+            mix_A0995 \
+            mix_A0999 \
+            mix_A09999 \
+            mix_A09999_b005 \
+            mix_A09999_b002 \
+            mix_A09999_m500
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_mixing_scan.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_mixing_scan.txt
+            tail -20 "output/$cfg.log" | tee -a output/tqs_mixing_scan.txt
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tqs-mixing-scan
+          path: |
+            output/tqs_mixing_scan.txt
+            output/mix_*.log
+            output/mix_*pk.dat

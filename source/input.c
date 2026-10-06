@@ -2190,6 +2190,42 @@ int input_read_parameters_general(struct file_content * pfc,
     /** 4.d) Do we want output perturbations in current gauge, instead of automatic conversion to Newtonian variables? */
     class_read_flag("get_perturbations_in_current_gauge",ppt->get_perturbations_in_current_gauge);
 
+    /** 4.e) Textured Quantum Spacetime (TQS) scalar-sector parameters */
+    class_read_flag("tqs_enable",ppt->tqs_enable);
+    if (ppt->tqs_enable == _TRUE_) {
+      class_read_double("tqs_A_clock",ppt->tqs_A_clock);
+      class_read_double("tqs_beta_phi",ppt->tqs_beta_phi);
+      class_read_double("tqs_epsilon",ppt->tqs_epsilon);
+      class_read_double("tqs_mu_C",ppt->tqs_mu_C);
+      class_read_double("tqs_HC_over_H0",ppt->tqs_HC_over_H0);
+      class_read_double("tqs_zeta0",ppt->tqs_zeta0);
+      class_read_double("tqs_mL_over_H0",ppt->tqs_mL_over_H0);
+
+      /* Keep the homogeneous background and perturbation sectors on
+         exactly the same TQS parameter point. */
+      pba->tqs_enable = ppt->tqs_enable;
+      pba->tqs_A_clock = ppt->tqs_A_clock;
+      pba->tqs_beta_phi = ppt->tqs_beta_phi;
+      pba->tqs_epsilon = ppt->tqs_epsilon;
+      pba->tqs_mu_C = ppt->tqs_mu_C;
+      pba->tqs_HC_over_H0 = ppt->tqs_HC_over_H0;
+      pba->tqs_zeta0 = ppt->tqs_zeta0;
+      pba->tqs_mL_over_H0 = ppt->tqs_mL_over_H0;
+
+      class_test(ppt->gauge != newtonian,
+                 errmsg,
+                 "TQS currently requires gauge = newtonian");
+      class_test((ppt->tqs_A_clock <= 0.75) || (ppt->tqs_A_clock >= 1.0),
+                 errmsg,
+                 "TQS healthy matched branch requires 0.75 < tqs_A_clock < 1");
+      class_test((ppt->tqs_epsilon <= 0.) || (ppt->tqs_mu_C < 0.) || (ppt->tqs_zeta0 <= 0.),
+                 errmsg,
+                 "TQS requires epsilon>0, mu_C>=0, zeta0>0");
+      class_test((ppt->tqs_HC_over_H0 <= 0.) || (ppt->tqs_mL_over_H0 <= 0.),
+                 errmsg,
+                 "TQS requires H_C/H_0>0 and m_L/H_0>0");
+    }
+
   }
 
   /** 5) h in [-] and H_0/c in [1/Mpc = h/2997.9 = h*10^5/c] */
@@ -5884,6 +5920,24 @@ int input_default_params(struct background *pba,
   ppt->has_matter_source_in_current_gauge = _FALSE_;
   /** 4.d) keep output perturbations in current gauge */
   ppt->get_perturbations_in_current_gauge = _FALSE_;
+
+  /** 4.e) TQS defaults: disabled, with benchmark values inert until enabled */
+  ppt->tqs_enable = _FALSE_;
+  ppt->tqs_A_clock = 0.9999;
+  ppt->tqs_beta_phi = 0.111272;
+  ppt->tqs_epsilon = 0.001471;
+  ppt->tqs_mu_C = 12.0;
+  ppt->tqs_HC_over_H0 = 0.1;
+  ppt->tqs_zeta0 = 0.9;
+  ppt->tqs_mL_over_H0 = 1.e5;
+  pba->tqs_enable = _FALSE_;
+  pba->tqs_A_clock = ppt->tqs_A_clock;
+  pba->tqs_beta_phi = ppt->tqs_beta_phi;
+  pba->tqs_epsilon = ppt->tqs_epsilon;
+  pba->tqs_mu_C = ppt->tqs_mu_C;
+  pba->tqs_HC_over_H0 = ppt->tqs_HC_over_H0;
+  pba->tqs_zeta0 = ppt->tqs_zeta0;
+  pba->tqs_mL_over_H0 = ppt->tqs_mL_over_H0;
 
   /** 5) Hubble parameter */
   pba->h = 0.67810;

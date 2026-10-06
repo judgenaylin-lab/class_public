@@ -233,6 +233,16 @@ struct perturbations
 
   short get_perturbations_in_current_gauge; /**< whether to keep the output table of perturbations (controlled by 'store_perturbations' and 'k_output_values') in current gauge, instead of automatic conversion to Newtonian gauge */
 
+  /** TQS matched-clock / mesh extension (physical Newtonian gauge) */
+  short tqs_enable;              /**< enable Textured Quantum Spacetime scalar sector */
+  double tqs_A_clock;            /**< matched clock coefficient A, healthy branch 3/4 < A < 1 */
+  double tqs_beta_phi;           /**< physical-metric mesh coupling beta_phi */
+  double tqs_epsilon;            /**< low-strain mesh regulator */
+  double tqs_mu_C;               /**< cosmological memory stiffness */
+  double tqs_HC_over_H0;         /**< memory crossover H_C/H_0 */
+  double tqs_zeta0;              /**< positive mesh time-kinetic regulator */
+  double tqs_mL_over_H0;         /**< regular microscopic pinning scale m_L/H_0 */
+
   //@}
 
   /** @name - version of the Boltzmann equation */
@@ -549,6 +559,11 @@ struct perturbations_vector
   int index_pt_Gamma_fld;  /**< unique dark energy dynamical variable in PPF case */
   int index_pt_phi_scf;  /**< scalar field density */
   int index_pt_phi_prime_scf;  /**< scalar field velocity */
+
+  /* TQS scalar degrees of freedom (only allocated for scalar modes when tqs_enable=TRUE) */
+  int index_pt_tqs_pi;             /**< conformal Stückelberg clock perturbation pi */
+  int index_pt_tqs_varphi;         /**< mesh perturbation delta phi */
+  int index_pt_tqs_varphi_prime;   /**< conformal-time derivative of mesh perturbation */
 
   /* Boltzmann hierarchy for ultra-relativistic species. For scalar
      modes the code uses (delta_ur, theta_ur, shear_ur), connected to

@@ -2932,6 +2932,7 @@ int perturbations_solve(
   int * previous_approx;
 
   int n_ncdm,is_early_enough;
+  ErrorMsg tqs_evolver_error;
 
   /* function pointer to ODE evolver and names of possible evolvers */
 
@@ -3229,24 +3230,52 @@ int perturbations_solve(
       generic_evolver = evolver_ndf15;
     }
 
-    class_call(generic_evolver(perturbations_derivs,
-                               interval_limit[index_interval],
-                               interval_limit[index_interval+1],
-                               ppw->pv->y,
-                               ppw->pv->used_in_sources,
-                               ppw->pv->pt_size,
-                               &ppaw,
-                               ppr->tol_perturbations_integration,
-                               ppr->smallest_allowed_variation,
-                               perturbations_timescale,
-                               ppr->perturbations_integration_stepsize,
-                               ppt->tau_sampling,
-                               tau_actual_size,
-                               perturbations_sources,
-                               perhaps_print_variables,
-                               ppt->error_message),
-               ppt->error_message,
-               ppt->error_message);
+    if (generic_evolver(perturbations_derivs,
+                        interval_limit[index_interval],
+                        interval_limit[index_interval+1],
+                        ppw->pv->y,
+                        ppw->pv->used_in_sources,
+                        ppw->pv->pt_size,
+                        &ppaw,
+                        ppr->tol_perturbations_integration,
+                        ppr->smallest_allowed_variation,
+                        perturbations_timescale,
+                        ppr->perturbations_integration_stepsize,
+                        ppt->tau_sampling,
+                        tau_actual_size,
+                        perturbations_sources,
+                        perhaps_print_variables,
+                        tqs_evolver_error) == _FAILURE_) {
+      if ((ppt->tqs_enable == _TRUE_) && _scalars_) {
+        class_stop(ppt->error_message,
+                   "TQS evolver failed at k=%g 1/Mpc, index_k=%d, interval=%d/%d, tau=[%g,%g]. "
+                   "state: phi=%g psi=%g pi=%g varphi=%g varphi_prime=%g phi_prime=%g. Underlying error: %s",
+                   k,
+                   index_k,
+                   index_interval,
+                   interval_number,
+                   interval_limit[index_interval],
+                   interval_limit[index_interval+1],
+                   ppw->pv->y[ppw->pv->index_pt_phi],
+                   ppw->pvecmetric[ppw->index_mt_psi],
+                   ppw->pv->y[ppw->pv->index_pt_tqs_pi],
+                   ppw->pv->y[ppw->pv->index_pt_tqs_varphi],
+                   ppw->pv->y[ppw->pv->index_pt_tqs_varphi_prime],
+                   ppw->pvecmetric[ppw->index_mt_phi_prime],
+                   tqs_evolver_error);
+      }
+      else {
+        class_stop(ppt->error_message,
+                   "perturbation evolver failed at k=%g 1/Mpc, index_k=%d, interval=%d/%d, tau=[%g,%g]. Underlying error: %s",
+                   k,
+                   index_k,
+                   index_interval,
+                   interval_number,
+                   interval_limit[index_interval],
+                   interval_limit[index_interval+1],
+                   tqs_evolver_error);
+      }
+    }
 
   }
 
@@ -4085,6 +4114,12 @@ int perturbations_vector_init(
     class_define_index(ppv->index_pt_phi_scf,pba->has_scf,index_pt,1); /* scalar field density */
     class_define_index(ppv->index_pt_phi_prime_scf,pba->has_scf,index_pt,1); /* scalar field velocity */
 
+    /* TQS matched-clock and mesh fields. These variables are independent of
+       the radiation/tight-coupling approximation switches. */
+    class_define_index(ppv->index_pt_tqs_pi,ppt->tqs_enable,index_pt,1);
+    class_define_index(ppv->index_pt_tqs_varphi,ppt->tqs_enable,index_pt,1);
+    class_define_index(ppv->index_pt_tqs_varphi_prime,ppt->tqs_enable,index_pt,1);
+
     /* perturbed recombination: the indices are defined once tca is off. */
     if ( (ppt->has_perturbed_recombination == _TRUE_) && (ppw->approx[ppw->index_ap_tca] == (int)tca_off) ){
       class_define_index(ppv->index_pt_perturbed_recombination_delta_temp,_TRUE_,index_pt,1);
@@ -4645,6 +4680,88 @@ int perturbations_vector_init(
                ppt->error_message,
                ppt->error_message);
 
+    /* Physical-conformal adiabatic TQS initial mode.
+       The stored clock variable is now
+         P = pi_grid/(A^(1/4) a_phys),
+       i.e. the physical conformal time shift.  This makes the metric
+       dictionary regular:
+         zeta_hat = -Psi + beta u - Hconf P,
+         n_hat    =  Phi - beta u - P' - Hconf P.
+       For the adiabatic preferred-clock mode u=0 and W=Q*w1=-phi_bar'*n. */
+    if (_scalars_ && (ppt->tqs_enable == _TRUE_)) {
+      double a_tqs = ppw->pvecback[pba->index_bg_a];
+      double a2_tqs = a_tqs*a_tqs;
+      double k2_tqs = k*k;
+      double A_tqs = ppw->pvecback[pba->index_bg_tqs_A];
+      double C_tqs = sqrt(A_tqs);
+      double sqrtC_tqs = sqrt(C_tqs);
+      double Q_tqs = ppw->pvecback[pba->index_bg_tqs_Q];
+      double Xi_tqs = ppw->pvecback[pba->index_bg_tqs_Xi];
+      double F_tqs = A_tqs*Xi_tqs;
+      double Gamma_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma];
+      double B_tqs = 2.*A_tqs*(1.-A_tqs)/(4.*A_tqs-3.);
+      double alphaK_tqs = 2.*(1.-A_tqs);
+      double hconf_tqs = a_tqs*ppw->pvecback[pba->index_bg_H];
+      double p_tqs = ppw->pvecback[pba->index_bg_tqs_phi_prime];
+      double L_tqs = Q_tqs*ppw->pvecback[pba->index_bg_tqs_H_grid];
+      double P_tqs = 0.;
+      double theta_hat_tqs;
+      double Xeta_tqs;
+      double zeta_hat_tqs;
+      double Rconf_tqs;
+      double rest00_tqs;
+      double denom_n_tqs;
+      double n_hat_tqs = 0.;
+
+      class_call(perturbations_total_stress_energy(ppr,pba,pth,ppt,index_md,k,ppv->y,ppw),
+                 ppt->error_message,
+                 ppt->error_message);
+
+      /* J_hat=0 for the adiabatic energy-flow slicing. */
+      if ((ppw->rho_plus_p_tot != 0.) && (k2_tqs != 0.)) {
+        P_tqs = -ppw->rho_plus_p_theta/(ppw->rho_plus_p_tot*k2_tqs);
+      }
+
+      theta_hat_tqs =
+        ppw->rho_plus_p_theta+ppw->rho_plus_p_tot*k2_tqs*P_tqs;
+
+      Xeta_tqs =
+        1.5*(C_tqs*sqrtC_tqs*a2_tqs/k2_tqs)
+          *theta_hat_tqs/Gamma_tqs
+        +B_tqs*k2_tqs*P_tqs/(2.*Gamma_tqs);
+
+      zeta_hat_tqs =
+        -ppv->y[ppv->index_pt_phi]-hconf_tqs*P_tqs;
+
+      /* Q^2 R_hat = 3 A a^2[
+           delta rho-rho' P-2 beta rho(delta phi_N)],
+         with delta phi_N = u+phi_bar' P and u=0 initially. */
+      Rconf_tqs =
+        3.*A_tqs*a2_tqs
+        *(ppw->delta_rho
+          +3.*hconf_tqs*ppw->rho_plus_p_tot*P_tqs
+          -2.*ppt->tqs_beta_phi
+             *ppw->pvecback[pba->index_bg_rho_tot]*p_tqs*P_tqs);
+
+      rest00_tqs =
+        4.*A_tqs*k2_tqs*zeta_hat_tqs
+        +4.*Gamma_tqs*L_tqs*(-3.*Xeta_tqs+k2_tqs*P_tqs);
+
+      /* W=-p*n on the initial adiabatic slice.  The mesh kinetic energy
+         then contributes +F p^2 n to the lapse denominator. */
+      denom_n_tqs =
+        alphaK_tqs*A_tqs*k2_tqs+F_tqs*p_tqs*p_tqs;
+
+      if (denom_n_tqs > 0.) {
+        n_hat_tqs =
+          (2.*Rconf_tqs-rest00_tqs)/(2.*denom_n_tqs);
+      }
+
+      ppv->y[ppv->index_pt_tqs_pi] = P_tqs;
+      ppv->y[ppv->index_pt_tqs_varphi] = 0.;
+      ppv->y[ppv->index_pt_tqs_varphi_prime] = -p_tqs*n_hat_tqs;
+    }
+
   }
 
   /** - case of switching approximation while a wavenumber is being integrated */
@@ -4738,6 +4855,15 @@ int perturbations_vector_init(
 
         ppv->y[ppv->index_pt_phi_prime_scf] =
           ppw->pv->y[ppw->pv->index_pt_phi_prime_scf];
+      }
+
+      if (ppt->tqs_enable == _TRUE_) {
+        ppv->y[ppv->index_pt_tqs_pi] =
+          ppw->pv->y[ppw->pv->index_pt_tqs_pi];
+        ppv->y[ppv->index_pt_tqs_varphi] =
+          ppw->pv->y[ppw->pv->index_pt_tqs_varphi];
+        ppv->y[ppv->index_pt_tqs_varphi_prime] =
+          ppw->pv->y[ppw->pv->index_pt_tqs_varphi_prime];
       }
 
       if (ppt->gauge == synchronous)
@@ -7049,6 +7175,8 @@ int perturbations_timescale(
   double tau_h;
   /* (c) time scale of recombination, \f$ \tau_{\gamma} = 1/\kappa' \f$ */
   double tau_c;
+  /* (d) TQS mesh oscillation time scale */
+  double tau_tqs;
 
   /* various pointers allowing to extract the fields of the
      parameter_and_workspace input structure */
@@ -7098,6 +7226,34 @@ int perturbations_timescale(
 
     if ((ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) || (pba->has_ncdm == _TRUE_))
       *timescale = MIN(tau_k,*timescale);
+
+    if (ppt->tqs_enable == _TRUE_) {
+      double A = pvecback[pba->index_bg_tqs_A];
+      double C = sqrt(A);
+      double Q = pvecback[pba->index_bg_tqs_Q];
+      double Hgrid = pvecback[pba->index_bg_tqs_H_grid];
+      double sC = pvecback[pba->index_bg_tqs_sC];
+      double mu = pvecback[pba->index_bg_tqs_mu];
+      double Xi = pvecback[pba->index_bg_tqs_Xi];
+      double Fmesh = A*Xi;
+      double mL = ppt->tqs_mL_over_H0*pba->H0;
+      double beta_phi = ppt->tqs_beta_phi;
+      double Gamma_bb = pvecback[pba->index_bg_tqs_Gamma_bb];
+      double active_bg =
+        pvecback[pba->index_bg_rho_tot]+3.*pvecback[pba->index_bg_p_tot];
+      double force = pvecback[pba->index_bg_tqs_force];
+      double partial_force =
+        mL*mL*sC
+        +3.*beta_phi*beta_phi*Gamma_bb*Hgrid*Hgrid
+        -6.*beta_phi*beta_phi*C*active_bg;
+      double Mmove2 = partial_force+4.*beta_phi*force;
+      double omega2_tqs =
+        (mu*A*pppaw->k*pppaw->k+Q*Q*Mmove2)/Fmesh;
+      if (omega2_tqs > 0.) {
+        tau_tqs = 1./sqrt(omega2_tqs);
+        *timescale = MIN(tau_tqs,*timescale);
+      }
+    }
 
     if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) {
 
@@ -7256,11 +7412,63 @@ int perturbations_einstein(
          y[ppw->pv->index_pt_phi], which derivative is given by the
          second equation below (credits to Guido Walter Pettinari). */
 
-      /* equation for psi */
-      ppw->pvecmetric[ppw->index_mt_psi] = y[ppw->pv->index_pt_phi] - 4.5 * (a2/k2) * ppw->rho_plus_p_shear;
+      if (ppt->tqs_enable == _FALSE_) {
+        /* Standard GR equations for psi and phi'. */
+        ppw->pvecmetric[ppw->index_mt_psi] = y[ppw->pv->index_pt_phi] - 4.5 * (a2/k2) * ppw->rho_plus_p_shear;
+        ppw->pvecmetric[ppw->index_mt_phi_prime] = -a_prime_over_a * ppw->pvecmetric[ppw->index_mt_psi] + 1.5 * (a2/k2) * ppw->rho_plus_p_theta;
+      }
+      else {
+        /* TQS closure in CLASS physical conformal coordinates.
+           State variables:
+             P = pi_grid/(A^(1/4) a_phys),
+             u = delta phi on the preferred-clock slice,
+             W = Q delta(D_T phi), Q=A^(1/4)a_phys.
+           The exact moving-background metric dictionary simplifies to
+             zeta_hat=-Psi+beta u-Hconf P,
+             n_hat=Phi-beta u-P'-Hconf P. */
+        double A = ppw->pvecback[pba->index_bg_tqs_A];
+        double C = sqrt(A);
+        double sqrtC = sqrt(C);
+        double Q = ppw->pvecback[pba->index_bg_tqs_Q];
+        double Xi = ppw->pvecback[pba->index_bg_tqs_Xi];
+        double Fmesh = A*Xi;
+        double Gamma = ppw->pvecback[pba->index_bg_tqs_Gamma];
+        double B = 2.*A*(1.-A)/(4.*A-3.);
+        double Gamma_b = ppw->pvecback[pba->index_bg_tqs_Gamma_b];
+        double Gamma_phi = ppt->tqs_beta_phi*Gamma_b;
+        double beta_phi = ppt->tqs_beta_phi;
+        double P_tqs = y[ppw->pv->index_pt_tqs_pi];
+        double u_tqs = y[ppw->pv->index_pt_tqs_varphi];
+        double W_tqs = y[ppw->pv->index_pt_tqs_varphi_prime];
+        double p_bg = ppw->pvecback[pba->index_bg_tqs_phi_prime];
+        double Hgrid = ppw->pvecback[pba->index_bg_tqs_H_grid];
+        double hconf = a_prime_over_a;
+        double hconf_prime =
+          a*a*ppw->pvecback[pba->index_bg_H]*ppw->pvecback[pba->index_bg_H]
+          +a*ppw->pvecback[pba->index_bg_H_prime];
+        double Lgrid = Q*Hgrid;
+        double theta_hat =
+          ppw->rho_plus_p_theta+ppw->rho_plus_p_tot*k2*P_tqs;
+        double Xeta;
 
-      /* equation for phi' */
-      ppw->pvecmetric[ppw->index_mt_phi_prime] = -a_prime_over_a * ppw->pvecmetric[ppw->index_mt_psi] + 1.5 * (a2/k2) * ppw->rho_plus_p_theta;
+        /* Physical slip remains GR-form. */
+        ppw->pvecmetric[ppw->index_mt_psi] =
+          y[ppw->pv->index_pt_phi] - 4.5*(a2/k2)*ppw->rho_plus_p_shear;
+
+        /* Xeta=Q X from the grid 0i constraint, expressed in physical
+           conformal variables. */
+        Xeta =
+          1.5*(C*sqrtC*a2/k2)*(theta_hat/Gamma)
+          +B*k2*P_tqs/(2.*Gamma)
+          +(Gamma_phi/Gamma)*Lgrid*u_tqs
+          +Fmesh*p_bg*u_tqs/(2.*Gamma);
+
+        ppw->pvecmetric[ppw->index_mt_phi_prime] =
+          -hconf*ppw->pvecmetric[ppw->index_mt_psi]
+          +beta_phi*(W_tqs+hconf*u_tqs)
+          -(hconf_prime-hconf*hconf)*P_tqs
+          +Xeta;
+      }
 
       /* eventually, infer radiation streaming approximation for
          gamma and ur (this is exactly the right place to do it
@@ -11047,6 +11255,104 @@ int perturbations_derivs(double tau,
           }
         }
       }
+    }
+
+    /** - ---> TQS clock and mesh */
+    if (ppt->tqs_enable == _TRUE_) {
+      double A = pvecback[pba->index_bg_tqs_A];
+      double C = sqrt(A);
+      double sqrtC = sqrt(C);
+      double Q = pvecback[pba->index_bg_tqs_Q];
+      double alphaK = 2.*(1.-A);
+      double Gamma = pvecback[pba->index_bg_tqs_Gamma];
+      double B = 2.*A*(1.-A)/(4.*A-3.);
+      double Gamma_b = pvecback[pba->index_bg_tqs_Gamma_b];
+      double Gamma_phi = ppt->tqs_beta_phi*Gamma_b;
+      double beta_phi = ppt->tqs_beta_phi;
+      double P_tqs = y[pv->index_pt_tqs_pi];
+      double u_tqs = y[pv->index_pt_tqs_varphi];
+      double W_tqs = y[pv->index_pt_tqs_varphi_prime];
+      double phi_tqs = y[pv->index_pt_phi];
+      double psi_tqs = pvecmetric[ppw->index_mt_psi];
+      double hconf = a_prime_over_a;
+      double p_bg = pvecback[pba->index_bg_tqs_phi_prime];
+      double p_bg_prime = pvecback[pba->index_bg_tqs_phi_pp];
+      double Hgrid = pvecback[pba->index_bg_tqs_H_grid];
+      double Lgrid = Q*Hgrid;
+      double Mgrid = hconf-beta_phi*p_bg;
+      double sC = pvecback[pba->index_bg_tqs_sC];
+      double mu = pvecback[pba->index_bg_tqs_mu];
+      double Xi = pvecback[pba->index_bg_tqs_Xi];
+      double Xi_prime = pvecback[pba->index_bg_tqs_Xi_prime];
+      double Fmesh = A*Xi;
+      double mL = ppt->tqs_mL_over_H0*pba->H0;
+      double Gamma_bb = pvecback[pba->index_bg_tqs_Gamma_bb];
+      double active_bg =
+        pvecback[pba->index_bg_rho_tot]+3.*pvecback[pba->index_bg_p_tot];
+      double force = pvecback[pba->index_bg_tqs_force];
+      double partial_force =
+        mL*mL*sC
+        +3.*beta_phi*beta_phi*Gamma_bb*Hgrid*Hgrid
+        -6.*beta_phi*beta_phi*C*active_bg;
+      double Mmove2 = partial_force+4.*beta_phi*force;
+      double theta_hat =
+        ppw->rho_plus_p_theta+ppw->rho_plus_p_tot*k2*P_tqs;
+      double Xeta =
+        1.5*(C*sqrtC*a2/k2)*(theta_hat/Gamma)
+        +B*k2*P_tqs/(2.*Gamma)
+        +(Gamma_phi/Gamma)*Lgrid*u_tqs
+        +Fmesh*p_bg*u_tqs/(2.*Gamma);
+      double deltaK_eta = -3.*Xeta+k2*P_tqs;
+      double delta_rho_mesh_conf =
+        Fmesh*p_bg*W_tqs
+        -2.*beta_phi*Fmesh*p_bg*p_bg*u_tqs
+        +Q*Q*mL*mL*sC*pvecback[pba->index_bg_tqs_phi]*u_tqs;
+      double rho_prime =
+        -3.*hconf*ppw->rho_plus_p_tot;
+      double Rconf =
+        3.*A*a2
+        *(ppw->delta_rho
+          -rho_prime*P_tqs
+          -2.*beta_phi*pvecback[pba->index_bg_rho_tot]
+             *(u_tqs+p_bg*P_tqs));
+      double zeta_hat =
+        -phi_tqs+beta_phi*u_tqs-hconf*P_tqs;
+      double rest00 =
+        4.*A*k2*zeta_hat
+        +4.*Gamma*Lgrid*(-3.*Xeta+k2*P_tqs)
+        +6.*Gamma_phi*Lgrid*Lgrid*u_tqs;
+      double n_hat =
+        (2.*Rconf+2.*delta_rho_mesh_conf-rest00)
+        /(2.*alphaK*A*k2);
+      double active_prime =
+        -3.*hconf*(pvecback[pba->index_bg_rho_tot]
+                   +pvecback[pba->index_bg_p_tot])
+        +3.*pvecback[pba->index_bg_p_tot_prime];
+      double delta_active_hat =
+        ppw->delta_rho+3.*ppw->delta_p-active_prime*P_tqs;
+      double coeff_nhat =
+        p_bg_prime-Mgrid*p_bg+(Xi_prime/Xi)*p_bg;
+      double source_deltaK =
+        -2.*beta_phi*Gamma_b*Lgrid*deltaK_eta/Fmesh;
+      double source_active =
+        -3.*beta_phi*a2*delta_active_hat/Xi;
+
+      /* Hamiltonian constraint determines the physical conformal clock shift. */
+      dy[pv->index_pt_tqs_pi] =
+        psi_tqs-beta_phi*u_tqs-hconf*P_tqs-n_hat;
+
+      /* u' = W + phi_bar' n_hat. */
+      dy[pv->index_pt_tqs_varphi] =
+        W_tqs+p_bg*n_hat;
+
+      /* W=Q*w1.  All grid-to-physical conversion factors are explicit. */
+      dy[pv->index_pt_tqs_varphi_prime] =
+        -(2.*hconf+Xi_prime/Xi)*W_tqs
+        -p_bg*deltaK_eta
+        +coeff_nhat*n_hat
+        -(mu*A*k2+Q*Q*Mmove2)*u_tqs/Fmesh
+        +source_deltaK
+        +source_active;
     }
 
     /** - ---> metric */

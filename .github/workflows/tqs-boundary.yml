@@ -1,0 +1,43 @@
+name: TQS kinetic-mixing boundary
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -j2 class
+      - name: Scan beta^2 over 1-A
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_boundary.txt
+          for cfg in \
+            bound_A09825_b111 \
+            bound_A0985_b111 \
+            bound_A09875_b111 \
+            bound_A099_b010 \
+            bound_A099_b0075 \
+            bound_A099_b005 \
+            bound_A09999_b001 \
+            bound_A09999_b00075 \
+            bound_A09999_b0005
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_boundary.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_boundary.txt
+            tail -10 "output/$cfg.log" | tee -a output/tqs_boundary.txt
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tqs-kinetic-boundary
+          path: |
+            output/tqs_boundary.txt
+            output/bound_*.log
+            output/bound_*pk.dat

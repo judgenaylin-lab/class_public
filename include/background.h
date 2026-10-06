@@ -123,6 +123,16 @@ struct background
   enum varconst_dependence varconst_dep; /**< dependence of the varying fundamental constants as a function of time */
   double varconst_transition_redshift; /**< redshift of transition between varied fundamental constants and normal fundamental constants in the 'varconst_instant' case*/
 
+  /** TQS homogeneous mesh background (first production consistency stage). */
+  short tqs_enable;              /**< evolve the homogeneous TQS mesh background */
+  double tqs_A_clock;            /**< reference A at phi_TQS=0 */
+  double tqs_beta_phi;           /**< disformal mesh coupling */
+  double tqs_epsilon;            /**< low-strain regulator */
+  double tqs_mu_C;               /**< memory stiffness */
+  double tqs_HC_over_H0;         /**< memory crossover H_C/H_0 */
+  double tqs_zeta0;              /**< positive time-kinetic regulator */
+  double tqs_mL_over_H0;         /**< regular pinning scale m_L/H_0 */
+
   //@}
 
 
@@ -181,6 +191,22 @@ struct background
   int index_bg_rho_scf;       /**< scalar field energy density */
   int index_bg_p_scf;         /**< scalar field pressure */
   int index_bg_p_prime_scf;         /**< scalar field pressure */
+
+  /* TQS homogeneous mesh quantities */
+  int index_bg_tqs_phi;          /**< homogeneous mesh field */
+  int index_bg_tqs_phi_prime;    /**< conformal-time derivative */
+  int index_bg_tqs_A;            /**< A(phi)=A0 exp(-4 beta phi) */
+  int index_bg_tqs_Q;            /**< dt_grid/d eta_phys = A^(1/4) a_phys */
+  int index_bg_tqs_H_grid;       /**< grid-frame Hubble rate entering the ADM clock */
+  int index_bg_tqs_phi_pp;       /**< d^2 phi_bar/d eta_phys^2 */
+  int index_bg_tqs_Xi_prime;     /**< d Xi/d eta_phys */
+  int index_bg_tqs_sC;           /**< FLRW memory occupation */
+  int index_bg_tqs_mu;           /**< epsilon+mu_C sC */
+  int index_bg_tqs_Xi;           /**< mu+zeta0 */
+  int index_bg_tqs_Gamma;        /**< A^2/(4A-3) */
+  int index_bg_tqs_Gamma_b;      /**< d Gamma / d(beta phi) */
+  int index_bg_tqs_Gamma_bb;     /**< second derivative */
+  int index_bg_tqs_force;        /**< homogeneous mesh driving force in Mpc^-2 */
 
   int index_bg_rho_ncdm1;     /**< density of first ncdm species (others contiguous) */
   int index_bg_p_ncdm1;       /**< pressure of first ncdm species (others contiguous) */
@@ -257,6 +283,9 @@ struct background
   int index_bi_rho_fld; /**< {B} fluid density */
   int index_bi_phi_scf;       /**< {B} scalar field value */
   int index_bi_phi_prime_scf; /**< {B} scalar field derivative wrt conformal time */
+
+  int index_bi_tqs_phi;       /**< {B} homogeneous TQS mesh field */
+  int index_bi_tqs_phi_prime; /**< {B} conformal-time derivative of TQS mesh */
 
   int index_bi_time;    /**< {C} proper (cosmological) time in Mpc */
   int index_bi_rs;      /**< {C} sound horizon */

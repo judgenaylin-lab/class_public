@@ -1,0 +1,39 @@
+name: TQS moving beta stability scan
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  beta-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -j2 class
+      - name: Run beta scan
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_beta_scan.txt
+          for cfg in \
+            beta_0p0001 \
+            beta_0p001 \
+            beta_0p005 \
+            beta_0p01 \
+            beta_0p02 \
+            beta_0p05
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_beta_scan.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_beta_scan.txt
+            grep -E "TQS_BACKGROUND_SUMMARY|TQS evolver failed" "output/$cfg.log" | tail -5 | tee -a output/tqs_beta_scan.txt
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tqs-beta-stability
+          path: |
+            output/tqs_beta_scan.txt
+            output/beta_*.log

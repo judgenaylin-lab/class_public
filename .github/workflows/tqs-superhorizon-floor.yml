@@ -1,0 +1,38 @@
+name: TQS superhorizon floor scan
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  floor-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -j2 class
+      - name: Run floor scan
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_floor_scan.txt
+          for cfg in \
+            floor_0p2 \
+            floor_0p5 \
+            floor_1p0 \
+            floor_2p0
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_floor_scan.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_floor_scan.txt
+            grep -E "TQS_BACKGROUND_SUMMARY|TQS evolver failed" "output/$cfg.log" | tail -5 | tee -a output/tqs_floor_scan.txt
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tqs-superhorizon-floor
+          path: |
+            output/tqs_floor_scan.txt
+            output/floor_*.log
+            output/floor_*cl*.dat
