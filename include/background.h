@@ -196,6 +196,10 @@ struct background
   int index_bg_tqs_phi;          /**< homogeneous mesh field */
   int index_bg_tqs_phi_prime;    /**< conformal-time derivative */
   int index_bg_tqs_A;            /**< A(phi)=A0 exp(-4 beta phi) */
+  int index_bg_tqs_Q;            /**< dt_grid/d eta_phys = A^(1/4) a_phys */
+  int index_bg_tqs_H_grid;       /**< grid-frame Hubble rate entering the ADM clock */
+  int index_bg_tqs_phi_pp;       /**< d^2 phi_bar/d eta_phys^2 */
+  int index_bg_tqs_Xi_prime;     /**< d Xi/d eta_phys */
   int index_bg_tqs_sC;           /**< FLRW memory occupation */
   int index_bg_tqs_mu;           /**< epsilon+mu_C sC */
   int index_bg_tqs_Xi;           /**< mu+zeta0 */
