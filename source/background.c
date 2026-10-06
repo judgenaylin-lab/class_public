@@ -400,6 +400,7 @@ int background_functions(
   double phi, phi_prime;
   /* homogeneous TQS mesh quantities */
   double tqs_phi=0.,tqs_phi_prime=0.,tqs_A=1.,tqs_C=1.;
+  double tqs_Q=1.,tqs_H_grid=0.,tqs_phi_pp=0.,tqs_Xi_prime=0.;
   double tqs_sC=0.,tqs_mu=0.,tqs_Xi=1.;
   double tqs_Gamma=1.,tqs_Gamma_b=0.,tqs_Gamma_bb=0.,tqs_force=0.;
   double tqs_HC=0.,tqs_mL=0.;
@@ -595,33 +596,112 @@ int background_functions(
   pvecback[pba->index_bg_H_prime] = - (3./2.) * (rho_tot + p_tot) * a + pba->K/a;
 
   if (pba->tqs_enable == _TRUE_) {
-    tqs_A = pba->tqs_A_clock*exp(-4.*pba->tqs_beta_phi*tqs_phi);
+    double beta = pba->tqs_beta_phi;
+    double sqrtC;
+    double Hconf;
+    double Hconf_prime;
+    double Lgrid;
+    double Mgrid;
+    double active_bg;
+    double dsdH;
+    double Xi0_prime;
+    double Xi_phi_pp_coeff;
+    double phi_pp_rhs;
+    double phi_pp_den;
+
+    /* CLASS uses the physical scale factor and physical conformal time.
+       The TQS ADM equations use grid proper time.  With C=sqrt(A),
+
+         a_phys = sqrt(C) a_grid,
+         dt_grid/deta_phys = Q = sqrt(C) a_phys,
+         H_grid = (Hconf_phys + beta phi')/Q.
+
+       Keeping this conversion explicit is essential once A is time dependent. */
+    tqs_A = pba->tqs_A_clock*exp(-4.*beta*tqs_phi);
     class_test((tqs_A <= 0.75) || (tqs_A >= 1.0),
                pba->error_message,
                "TQS homogeneous background left healthy branch: A=%g at a=%g, phi=%g",
                tqs_A,a,tqs_phi);
+
     tqs_C = sqrt(tqs_A);
+    sqrtC = sqrt(tqs_C);
+    tqs_Q = a*sqrtC;
+
+    Hconf = a*pvecback[pba->index_bg_H];
+    Hconf_prime =
+      a*a*pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]
+      +a*pvecback[pba->index_bg_H_prime];
+
+    Lgrid = Hconf + beta*tqs_phi_prime;
+    Mgrid = Hconf - beta*tqs_phi_prime;
+    tqs_H_grid = Lgrid/tqs_Q;
+
     tqs_Gamma = tqs_A*tqs_A/(4.*tqs_A-3.);
     tqs_Gamma_b =
       8.*tqs_A*tqs_A*(3.-2.*tqs_A)/((4.*tqs_A-3.)*(4.*tqs_A-3.));
     tqs_Gamma_bb =
       64.*tqs_A*tqs_A*(4.*tqs_A*tqs_A-9.*tqs_A+9.)
       /((4.*tqs_A-3.)*(4.*tqs_A-3.)*(4.*tqs_A-3.));
+
     tqs_HC = pba->tqs_HC_over_H0*pba->H0;
     tqs_mL = pba->tqs_mL_over_H0*pba->H0;
-    tqs_sC = pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]
-      /(pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]+tqs_HC*tqs_HC);
+
+    tqs_sC =
+      tqs_H_grid*tqs_H_grid
+      /(tqs_H_grid*tqs_H_grid+tqs_HC*tqs_HC);
     tqs_mu = pba->tqs_epsilon+pba->tqs_mu_C*tqs_sC;
     tqs_Xi = tqs_mu+pba->tqs_zeta0;
+
+    active_bg = rho_tot+3.*p_tot;
     tqs_force =
-      3.*pba->tqs_beta_phi*tqs_Gamma_b
-        *pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]
-      +3.*pba->tqs_beta_phi*tqs_C*(rho_tot+3.*p_tot)
+      3.*beta*tqs_Gamma_b*tqs_H_grid*tqs_H_grid
+      +3.*beta*tqs_C*active_bg
       +tqs_mL*tqs_mL*tqs_sC*tqs_phi;
+
+    /* s_C depends on H_grid, and H_grid' contains phi''.  Hence Xi' is
+       linear in phi'' and the physical-conformal mesh equation is solved
+       algebraically for phi'' rather than iterated numerically. */
+    dsdH =
+      2.*tqs_H_grid*tqs_HC*tqs_HC
+      /((tqs_H_grid*tqs_H_grid+tqs_HC*tqs_HC)
+        *(tqs_H_grid*tqs_H_grid+tqs_HC*tqs_HC));
+
+    Xi0_prime =
+      pba->tqs_mu_C*dsdH
+      *(Hconf_prime-Lgrid*Mgrid)/tqs_Q;
+    Xi_phi_pp_coeff =
+      pba->tqs_mu_C*dsdH*beta/tqs_Q;
+
+    /* Transforming the grid-cosmic equation to physical conformal time gives
+
+       phi'' +(2 Hconf + Xi'/Xi) phi' +2 beta phi'^2
+             +Q^2 F_TQS/(A Xi) = 0.
+
+       The +2 beta sign is a consequence of the time/scale-factor map and
+       differs from the grid-conformal form. */
+    phi_pp_rhs =
+      -(2.*Hconf+Xi0_prime/tqs_Xi)*tqs_phi_prime
+      -2.*beta*tqs_phi_prime*tqs_phi_prime
+      -tqs_Q*tqs_Q*tqs_force/(tqs_A*tqs_Xi);
+
+    phi_pp_den =
+      1.+tqs_phi_prime*Xi_phi_pp_coeff/tqs_Xi;
+
+    class_test(fabs(phi_pp_den) < 1.e-12,
+               pba->error_message,
+               "TQS physical-conformal background equation became singular: denominator=%g",
+               phi_pp_den);
+
+    tqs_phi_pp = phi_pp_rhs/phi_pp_den;
+    tqs_Xi_prime = Xi0_prime+Xi_phi_pp_coeff*tqs_phi_pp;
 
     pvecback[pba->index_bg_tqs_phi] = tqs_phi;
     pvecback[pba->index_bg_tqs_phi_prime] = tqs_phi_prime;
     pvecback[pba->index_bg_tqs_A] = tqs_A;
+    pvecback[pba->index_bg_tqs_Q] = tqs_Q;
+    pvecback[pba->index_bg_tqs_H_grid] = tqs_H_grid;
+    pvecback[pba->index_bg_tqs_phi_pp] = tqs_phi_pp;
+    pvecback[pba->index_bg_tqs_Xi_prime] = tqs_Xi_prime;
     pvecback[pba->index_bg_tqs_sC] = tqs_sC;
     pvecback[pba->index_bg_tqs_mu] = tqs_mu;
     pvecback[pba->index_bg_tqs_Xi] = tqs_Xi;
@@ -2776,24 +2856,12 @@ int background_derivs(
   }
 
   if (pba->tqs_enable == _TRUE_) {
-    double HC = pba->tqs_HC_over_H0*pba->H0;
-    double Hprime = pvecback[pba->index_bg_H_prime];
-    double sC = pvecback[pba->index_bg_tqs_sC];
-    double Xi = pvecback[pba->index_bg_tqs_Xi];
-    double dH_dlna = Hprime/(a*H);
-    double dsC_dlna =
-      2.*H*HC*HC*dH_dlna
-      /((H*H+HC*HC)*(H*H+HC*HC));
-    double dXi_dlna = pba->tqs_mu_C*dsC_dlna;
-    double A = pvecback[pba->index_bg_tqs_A];
-    double force = pvecback[pba->index_bg_tqs_force];
+    double Hconf = a*H;
     double tqs_prime = y[pba->index_bi_tqs_phi_prime];
 
-    dy[pba->index_bi_tqs_phi] = tqs_prime/(a*H);
+    dy[pba->index_bi_tqs_phi] = tqs_prime/Hconf;
     dy[pba->index_bi_tqs_phi_prime] =
-      -(2.+dXi_dlna/Xi)*tqs_prime
-      +2.*pba->tqs_beta_phi*tqs_prime*tqs_prime/(a*H)
-      -a*force/(H*A*Xi);
+      pvecback[pba->index_bg_tqs_phi_pp]/Hconf;
   }
 
   return _SUCCESS_;
