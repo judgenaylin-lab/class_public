@@ -4729,7 +4729,10 @@ int perturbations_vector_init(
 
       rho_hat_tqs =
         3.*C_tqs*(ppw->delta_rho
-                  +3.*H_tqs*ppw->rho_plus_p_tot*pi_tqs);
+                  +3.*H_tqs*ppw->rho_plus_p_tot*pi_tqs
+                  -2.*ppt->tqs_beta_phi
+                    *ppw->pvecback[pba->index_bg_rho_tot]
+                    *v_tqs*pi_tqs);
 
       rest00_tqs =
         4.*(k2_tqs/a2_tqs)*zeta_hat_tqs
@@ -11307,7 +11310,8 @@ int perturbations_derivs(double tau,
       double rho_hat =
         3.*C*(ppw->delta_rho
               +3.*Hphys*ppw->rho_plus_p_tot*pi_tqs
-              -2.*beta_phi*pvecback[pba->index_bg_rho_tot]*u_tqs);
+              -2.*beta_phi*pvecback[pba->index_bg_rho_tot]
+                *(u_tqs+v_bg*pi_tqs));
       double zeta_hat =
         -phi_tqs
         +beta_phi*(u_tqs+v_bg*pi_tqs)
