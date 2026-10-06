@@ -1,0 +1,39 @@
+name: TQS moving-background stability scan
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  moving-stability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -j2 class
+      - name: Run moving-background CMB scan
+        shell: bash
+        run: |
+          set +e
+          mkdir -p output
+          : > output/tqs_moving_stability.txt
+          for cfg in \
+            move_control_beta0 \
+            move_mu3000 \
+            move_mu5000 \
+            move_mu10000 \
+            move_m3e5 \
+            move_m1e6
+          do
+            echo "===== $cfg =====" | tee -a output/tqs_moving_stability.txt
+            ./class ".github/tqs/$cfg.ini" > "output/$cfg.log" 2>&1
+            rc=$?
+            echo "exit_code=$rc" | tee -a output/tqs_moving_stability.txt
+            grep -E "TQS_BACKGROUND_SUMMARY|TQS evolver failed" "output/$cfg.log" | tail -5 | tee -a output/tqs_moving_stability.txt
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tqs-moving-stability
+          path: |
+            output/tqs_moving_stability.txt
+            output/move_*.log
