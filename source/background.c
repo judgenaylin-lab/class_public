@@ -1127,6 +1127,10 @@ int background_indices(
   class_define_index(pba->index_bg_tqs_phi,pba->tqs_enable,index_bg,1);
   class_define_index(pba->index_bg_tqs_phi_prime,pba->tqs_enable,index_bg,1);
   class_define_index(pba->index_bg_tqs_A,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Q,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_H_grid,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_phi_pp,pba->tqs_enable,index_bg,1);
+  class_define_index(pba->index_bg_tqs_Xi_prime,pba->tqs_enable,index_bg,1);
   class_define_index(pba->index_bg_tqs_sC,pba->tqs_enable,index_bg,1);
   class_define_index(pba->index_bg_tqs_mu,pba->tqs_enable,index_bg,1);
   class_define_index(pba->index_bg_tqs_Xi,pba->tqs_enable,index_bg,1);
