@@ -4680,41 +4680,16 @@ int perturbations_vector_init(
                ppt->error_message,
                ppt->error_message);
 
-    /* Put the additional TQS variables on the regular adiabatic branch.
-       The preferred clock is initially aligned with the total energy-flow
-       slicing (J_hat=0), while the heavy mesh field starts on the
-       instantaneous regular-pinning attractor instead of at varphi=0. */
+    /* Moving-background adiabatic TQS initial mode.
+       For a pure primordial time shift, the mesh perturbation vanishes on
+       the preferred-clock slicing: u=delta phi_U=0.  Its unitary velocity
+       perturbation w1 also vanishes.  The clock displacement is aligned with
+       the total energy-flow slicing (J_hat=0), after which the exact 00/0i
+       constraints determine the metric/clock evolution. */
     if (_scalars_ && (ppt->tqs_enable == _TRUE_)) {
       double a_tqs = ppw->pvecback[pba->index_bg_a];
-      double a2_tqs = a_tqs*a_tqs;
       double k2_tqs = k*k;
-      double H_tqs = ppw->pvecback[pba->index_bg_H];
-      double Hc_tqs = a_tqs*H_tqs;
-      double A_tqs = ppw->pvecback[pba->index_bg_tqs_A];
-      double C_tqs = sqrt(A_tqs);
-      double Gamma_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma];
-      double B_tqs = 2.*A_tqs*(1.-A_tqs)/(4.*A_tqs-3.);
-      double Gamma_b_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma_b];
-      double Gamma_phi_tqs = ppt->tqs_beta_phi*Gamma_b_tqs;
-      double HC_tqs = ppt->tqs_HC_over_H0*pba->H0;
-      double sC_tqs = ppw->pvecback[pba->index_bg_tqs_sC];
-      double mu_tqs = ppw->pvecback[pba->index_bg_tqs_mu];
-      double mL_tqs = ppt->tqs_mL_over_H0*pba->H0;
-      double Gamma_bb_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma_bb];
-      double active_bg_tqs =
-        ppw->pvecback[pba->index_bg_rho_tot]
-        +3.*ppw->pvecback[pba->index_bg_p_tot];
-      double meff2_tqs =
-        mL_tqs*mL_tqs*sC_tqs
-        +3.*ppt->tqs_beta_phi*ppt->tqs_beta_phi
-          *Gamma_bb_tqs*H_tqs*H_tqs
-        -6.*ppt->tqs_beta_phi*ppt->tqs_beta_phi
-          *C_tqs*active_bg_tqs;
       double pi_tqs = 0.;
-      double Xeta0_tqs;
-      double deltaK0_tqs;
-      double numerator_tqs;
-      double denominator_tqs;
 
       class_call(perturbations_total_stress_energy(ppr,pba,pth,ppt,index_md,k,ppv->y,ppw),
                  ppt->error_message,
@@ -4723,29 +4698,9 @@ int perturbations_vector_init(
       if ((ppw->rho_plus_p_tot != 0.) && (k2_tqs != 0.)) {
         pi_tqs = -a_tqs*ppw->rho_plus_p_theta/(ppw->rho_plus_p_tot*k2_tqs);
       }
+
       ppv->y[ppv->index_pt_tqs_pi] = pi_tqs;
-
-      /* With the above clock choice J_hat vanishes at leading adiabatic order. */
-      Xeta0_tqs =
-        B_tqs*k2_tqs*pi_tqs/(2.*Gamma_tqs*A_tqs*a_tqs);
-      deltaK0_tqs =
-        -3.*Xeta0_tqs/a_tqs+k2_tqs*pi_tqs/(a2_tqs*A_tqs);
-
-      numerator_tqs =
-        -2.*ppt->tqs_beta_phi*Gamma_b_tqs*a2_tqs*H_tqs*deltaK0_tqs
-        -3.*ppt->tqs_beta_phi*C_tqs*a2_tqs*(ppw->delta_rho+3.*ppw->delta_p);
-
-      denominator_tqs =
-        mu_tqs*k2_tqs+a2_tqs*meff2_tqs
-        -6.*ppt->tqs_beta_phi*Gamma_b_tqs
-          *(Gamma_phi_tqs/Gamma_tqs)*a2_tqs*H_tqs*H_tqs;
-
-      if (fabs(denominator_tqs) > 0.) {
-        ppv->y[ppv->index_pt_tqs_varphi] = numerator_tqs/denominator_tqs;
-      }
-      else {
-        ppv->y[ppv->index_pt_tqs_varphi] = 0.;
-      }
+      ppv->y[ppv->index_pt_tqs_varphi] = 0.;
       ppv->y[ppv->index_pt_tqs_varphi_prime] = 0.;
     }
 
