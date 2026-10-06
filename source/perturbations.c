@@ -4681,15 +4681,31 @@ int perturbations_vector_init(
                ppt->error_message);
 
     /* Moving-background adiabatic TQS initial mode.
-       For a pure primordial time shift, the mesh perturbation vanishes on
-       the preferred-clock slicing: u=delta phi_U=0.  Its unitary velocity
-       perturbation w1 also vanishes.  The clock displacement is aligned with
-       the total energy-flow slicing (J_hat=0), after which the exact 00/0i
-       constraints determine the metric/clock evolution. */
+       On the preferred-clock slicing the adiabatic mode has u=0 and u'=0.
+       Since W=a*w1=u'-phi_bar'*n_hat, W does NOT vanish when the homogeneous
+       mesh is moving.  Solving the 00 constraint with W=-phi_bar'*n_hat
+       keeps the super-horizon Hamiltonian constraint regular as k->0. */
     if (_scalars_ && (ppt->tqs_enable == _TRUE_)) {
       double a_tqs = ppw->pvecback[pba->index_bg_a];
+      double a2_tqs = a_tqs*a_tqs;
       double k2_tqs = k*k;
+      double H_tqs = ppw->pvecback[pba->index_bg_H];
+      double A_tqs = ppw->pvecback[pba->index_bg_tqs_A];
+      double C_tqs = sqrt(A_tqs);
+      double Xi_tqs = ppw->pvecback[pba->index_bg_tqs_Xi];
+      double F_tqs = A_tqs*Xi_tqs;
+      double Gamma_tqs = ppw->pvecback[pba->index_bg_tqs_Gamma];
+      double B_tqs = 2.*A_tqs*(1.-A_tqs)/(4.*A_tqs-3.);
+      double alphaK_tqs = 2.*(1.-A_tqs);
+      double bg_phi_prime_tqs = ppw->pvecback[pba->index_bg_tqs_phi_prime];
+      double v_tqs = bg_phi_prime_tqs/a_tqs;
       double pi_tqs = 0.;
+      double Xeta_tqs;
+      double zeta_hat_tqs;
+      double rho_hat_tqs;
+      double rest00_tqs;
+      double denom_n_tqs;
+      double n_hat_tqs = 0.;
 
       class_call(perturbations_total_stress_energy(ppr,pba,pth,ppt,index_md,k,ppv->y,ppw),
                  ppt->error_message,
@@ -4699,9 +4715,41 @@ int perturbations_vector_init(
         pi_tqs = -a_tqs*ppw->rho_plus_p_theta/(ppw->rho_plus_p_tot*k2_tqs);
       }
 
+      /* u=0 makes the moving-background pieces in the 0i constraint vanish. */
+      Xeta_tqs =
+        1.5*(a2_tqs/k2_tqs)*(C_tqs/Gamma_tqs)
+        *(ppw->rho_plus_p_theta
+          +ppw->rho_plus_p_tot*k2_tqs*pi_tqs/a_tqs)
+        +B_tqs*k2_tqs*pi_tqs/(2.*Gamma_tqs*A_tqs*a_tqs);
+
+      zeta_hat_tqs =
+        -ppv->y[ppv->index_pt_phi]
+        +ppt->tqs_beta_phi*v_tqs*pi_tqs
+        -H_tqs*pi_tqs;
+
+      rho_hat_tqs =
+        3.*C_tqs*(ppw->delta_rho
+                  +3.*H_tqs*ppw->rho_plus_p_tot*pi_tqs);
+
+      rest00_tqs =
+        4.*(k2_tqs/a2_tqs)*zeta_hat_tqs
+        +4.*Gamma_tqs*H_tqs
+          *(-3.*Xeta_tqs/a_tqs+k2_tqs*pi_tqs/(a2_tqs*A_tqs));
+
+      /* W=-phi_bar'*n_hat gives delta rho_mesh=-F v^2 n_hat.
+         This adds F v^2 to the lapse denominator and removes the spurious
+         1/k^2 singularity of the moving-background adiabatic mode. */
+      denom_n_tqs =
+        alphaK_tqs*(k2_tqs/a2_tqs)+F_tqs*v_tqs*v_tqs;
+
+      if (denom_n_tqs > 0.) {
+        n_hat_tqs = (rho_hat_tqs-0.5*rest00_tqs)/denom_n_tqs;
+      }
+
       ppv->y[ppv->index_pt_tqs_pi] = pi_tqs;
       ppv->y[ppv->index_pt_tqs_varphi] = 0.;
-      ppv->y[ppv->index_pt_tqs_varphi_prime] = 0.;
+      ppv->y[ppv->index_pt_tqs_varphi_prime] =
+        -bg_phi_prime_tqs*n_hat_tqs;
     }
 
   }
