@@ -4760,7 +4760,7 @@ int perturbations_vector_init(
       ppv->y[ppv->index_pt_tqs_pi] = P_tqs;
       ppv->y[ppv->index_pt_tqs_varphi] = 0.;
       ppv->y[ppv->index_pt_tqs_varphi_prime] = -p_tqs*n_hat_tqs;
-    }}
+    }
 
   }
 
